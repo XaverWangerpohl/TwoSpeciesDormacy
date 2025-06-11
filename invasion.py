@@ -652,7 +652,7 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
 def run_cycles_ext(V0, W0, Y0, X0, Z0,
                    W_birth, Y_birth, W_death, Y_death,
                    X_in, Z_in, X_out, Z_out,
-                   durations, dt,
+                   extinction_rates, dt,
                    use_X, use_Z,
                    cycles,
                    severity,
@@ -660,7 +660,7 @@ def run_cycles_ext(V0, W0, Y0, X0, Z0,
                    perturb_Y=False,
                    save_plot=True):
     """
-    For each duration in `durations`, run `cycles` chained simulate_segment calls
+    For each duration in `extinction_rates`, run `cycles` chained simulate_segment calls
     (starting from equilibrium‐based initials), record the final W each cycle,
     and plot all W_final vs. cycle curves on one axes, colored by duration via viridis.
     If save_plot=True, saves the figure into ./run_cycles_ext/run_cycles_ext[.pdf | N.pdf].
@@ -671,12 +671,12 @@ def run_cycles_ext(V0, W0, Y0, X0, Z0,
     except AttributeError:
         base_cmap = cm.get_cmap('viridis')
     cmap = base_cmap
-    norm = mcolors.Normalize(vmin=min(durations), vmax=max(durations))
+    norm = mcolors.Normalize(vmin=min(extinction_rates), vmax=max(extinction_rates))
 
     plt.figure(figsize=(8, 5))
     cycles_idx = np.arange(1, cycles + 1)
 
-    for dur in durations:
+    for dur in extinction_rates:
         # equilibrium‐based initials
         W_eq, Y_eq = compute_nontrivial_slice(W_birth, W_death, Y_birth, Y_death)
         if W_eq is None:
@@ -709,15 +709,15 @@ def run_cycles_ext(V0, W0, Y0, X0, Z0,
 
     plt.xlabel('Cycle', fontsize=12)
     plt.ylabel(r'$W_{\mathrm{final}}$', fontsize=12)
-    plt.title(f'Final W vs Cycle for durations', fontsize=14)
+    plt.title(f'Final W vs Cycle for different extinction rates', fontsize=14)
     plt.grid(True)
 
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cbar = plt.colorbar(sm, pad=0.02, aspect=30)
-    cbar.set_label('Duration', fontsize=12)
+    cbar.set_label('Rates', fontsize=12)
 
-    plt.legend(title='Duration', fontsize=9, title_fontsize=10)
+    plt.legend(title='Rates', fontsize=9, title_fontsize=10)
     plt.tight_layout()
 
     # Saving
@@ -745,7 +745,7 @@ def run_cycles_ext(V0, W0, Y0, X0, Z0,
 def run_cycles(V0, W0, Y0, X0, Z0,
                W_birth, Y_birth, W_death, Y_death,
                X_in, Z_in, X_out, Z_out,
-               duration, dt,
+               extinction_rate, dt,
                use_X, use_Z,
                cycles,
                severity,
@@ -774,7 +774,7 @@ def run_cycles(V0, W0, Y0, X0, Z0,
             V_curr, W_curr, Y_curr, X_curr, Z_curr,
             W_birth, Y_birth, W_death, Y_death,
             X_in, Z_in, X_out, Z_out,
-            duration, dt,
+            extinction_rate, dt,
             use_X, use_Z,
             tol=1e-6,
             stop_at_eq=False
