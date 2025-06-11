@@ -705,7 +705,7 @@ def run_cycles_ext(V0, W0, Y0, X0, Z0,
             X_curr, Z_curr = X_arr[-1], Z_arr[-1]
 
         color = cmap(norm(dur))
-        plt.plot(cycles_idx, W_finals, '-o', color=color, label=f"T={dur}")
+        plt.plot(cycles_idx, W_finals, color=color, label=f"T={dur}")
 
     plt.xlabel('Cycle', fontsize=12)
     plt.ylabel(r'$W_{\mathrm{final}}$', fontsize=12)
@@ -753,37 +753,68 @@ def run_cycles(V0, W0, Y0, X0, Z0,
                perturb_Y=False,
                save_plot=True):
     """
-    Run 'cycles' successive simulate_segment calls, record final W each cycle,
-    and plot W_final vs. cycle.  If save_plot=True, saves figure into ./run_cycles/.
+    Run 'cycles' successive calls to simulate_segment, each time:
+      1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
+      2) record final V, W, Y
+      3) if perturb_W: set W0_next = (1-severity)*W_final and
+                         V0_next = (1-severity)*V_final
+      4) if perturb_Y: set Y0_next = (1-severity)*Y_final
+      5) X0_next = X_final, Z0_next = Z_final
+    After all cycles, plot cycle index vs final W, V, and Y.
+    Returns lists of final values [V_finals, W_finals, Y_finals].
     """
     V_curr, W_curr, Y_curr, X_curr, Z_curr = V0, W0, Y0, X0, Z0
+    V_finals = []
     W_finals = []
+    Y_finals = []
 
-    for _ in range(cycles):
-        _, V_arr, W_arr, Y_arr, X_arr, Z_arr, X_plot, Z_plot = simulate_segment(
+    for n in range(1, cycles+1):
+        # 1) simulate one segment
+        t_arr, V_arr, W_arr, Y_arr, X_arr, Z_arr, X_plot, Z_plot = simulate_segment(
             V_curr, W_curr, Y_curr, X_curr, Z_curr,
             W_birth, Y_birth, W_death, Y_death,
             X_in, Z_in, X_out, Z_out,
             duration, dt,
-            use_X=use_X, use_Z=use_Z,
-            tol=1e-6, stop_at_eq=False
+            use_X, use_Z,
+            tol=1e-6,
+            stop_at_eq=False
         )
-        V_final, W_final, Y_final = V_arr[-1], W_arr[-1], Y_arr[-1]
+
+        # 2) record finals
+        V_final = V_arr[-1]
+        W_final = W_arr[-1]
+        Y_final = Y_arr[-1]
+        V_finals.append(V_final)
         W_finals.append(W_final)
+        Y_finals.append(Y_final)
 
+        # 3) perturb for next cycle
         if perturb_W:
-            V_curr, W_curr = (1-severity)*V_final, (1-severity)*W_final
+            V_curr = (1 - severity) * V_final
+            W_curr = (1 - severity) * W_final
         else:
-            V_curr, W_curr = V_final, W_final
-        Y_curr = (1-severity)*Y_final if perturb_Y else Y_final
-        X_curr, Z_curr = X_arr[-1], Z_arr[-1]
+            V_curr = V_final
+            W_curr = W_final
 
+        if perturb_Y:
+            Y_curr = (1 - severity) * Y_final
+        else:
+            Y_curr = Y_final
+
+        # 4) carry over X, Z unchanged
+        X_curr = X_arr[-1]
+        Z_curr = Z_arr[-1]
+
+    # plot all three on one figure
     cycles_idx = np.arange(1, cycles+1)
-    plt.figure(figsize=(8,5))
-    plt.plot(cycles_idx, W_finals, '-o', color='darkgreen')
+    plt.figure(figsize=(8, 5))
+    plt.plot(cycles_idx, W_finals, label='W final', color='darkgreen')
+    plt.plot(cycles_idx, V_finals, label='V final', color='orange')
+    plt.plot(cycles_idx, Y_finals, label='Y final', color='darkblue')
     plt.xlabel('Cycle', fontsize=12)
-    plt.ylabel(r'$W_{\mathrm{final}}$', fontsize=12)
-    plt.title('Final W vs Cycle', fontsize=14)
+    plt.ylabel('Final Value', fontsize=12)
+    plt.title(f'Final V, W, Y after each cycle\n(severity={severity}, perturb_W={perturb_W}, perturb_Y={perturb_Y})', fontsize=14)
+    plt.legend()
     plt.grid(True)
     plt.tight_layout()
 
