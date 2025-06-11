@@ -649,3 +649,162 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
 
     plt.show()
 
+def run_cycles_ext(V0, W0, Y0, X0, Z0,
+                   W_birth, Y_birth, W_death, Y_death,
+                   X_in, Z_in, X_out, Z_out,
+                   durations, dt,
+                   use_X, use_Z,
+                   cycles,
+                   severity,
+                   perturb_W=False,
+                   perturb_Y=False,
+                   save_plot=True):
+    """
+    For each duration in `durations`, run `cycles` chained simulate_segment calls
+    (starting from equilibrium‐based initials), record the final W each cycle,
+    and plot all W_final vs. cycle curves on one axes, colored by duration via viridis.
+    If save_plot=True, saves the figure into ./run_cycles_ext/run_cycles_ext[.pdf | N.pdf].
+    """
+    # Prepare colormap
+    try:
+        base_cmap = cm.colormaps['viridis']
+    except AttributeError:
+        base_cmap = cm.get_cmap('viridis')
+    cmap = base_cmap
+    norm = mcolors.Normalize(vmin=min(durations), vmax=max(durations))
+
+    plt.figure(figsize=(8, 5))
+    cycles_idx = np.arange(1, cycles + 1)
+
+    for dur in durations:
+        # equilibrium‐based initials
+        W_eq, Y_eq = compute_nontrivial_slice(W_birth, W_death, Y_birth, Y_death)
+        if W_eq is None:
+            raise RuntimeError("No positive equilibrium exists.")
+        V_curr, W_curr, Y_curr, X_curr, Z_curr = W_eq-W0, W0, Y_eq, W0, Y_eq
+
+        W_finals = []
+        for _ in range(cycles):
+            _, V_arr, W_arr, Y_arr, X_arr, Z_arr, X_plot, Z_plot = simulate_segment(
+                V_curr, W_curr, Y_curr, X_curr, Z_curr,
+                W_birth, Y_birth, W_death, Y_death,
+                X_in, Z_in, X_out, Z_out,
+                duration=dur, dt=dt,
+                use_X=use_X, use_Z=use_Z,
+                tol=1e-6, stop_at_eq=False
+            )
+            V_final, W_final, Y_final = V_arr[-1], W_arr[-1], Y_arr[-1]
+            W_finals.append(W_final)
+
+            # perturb
+            if perturb_W:
+                V_curr, W_curr = (1-severity)*V_final, (1-severity)*W_final
+            else:
+                V_curr, W_curr = V_final, W_final
+            Y_curr = (1-severity)*Y_final if perturb_Y else Y_final
+            X_curr, Z_curr = X_arr[-1], Z_arr[-1]
+
+        color = cmap(norm(dur))
+        plt.plot(cycles_idx, W_finals, '-o', color=color, label=f"T={dur}")
+
+    plt.xlabel('Cycle', fontsize=12)
+    plt.ylabel(r'$W_{\mathrm{final}}$', fontsize=12)
+    plt.title(f'Final W vs Cycle for durations', fontsize=14)
+    plt.grid(True)
+
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, pad=0.02, aspect=30)
+    cbar.set_label('Duration', fontsize=12)
+
+    plt.legend(title='Duration', fontsize=9, title_fontsize=10)
+    plt.tight_layout()
+
+    # Saving
+    if save_plot:
+        folder = "run_cycles_ext"
+        os.makedirs(folder, exist_ok=True)
+        base = "run_cycles_ext"
+        pattern = os.path.join(folder, base + "*.pdf")
+        existing = glob.glob(pattern)
+        if not existing:
+            pdf_name = base + ".pdf"
+        else:
+            taken = set(int(os.path.basename(p).replace(base, "").replace(".pdf","") or 0)
+                        for p in existing if os.path.basename(p).replace(base, "").replace(".pdf","").isdigit() or p.endswith(base+".pdf"))
+            k = 0
+            while k in taken:
+                k += 1
+            pdf_name = f"{base}{k}.pdf"
+        path = os.path.join(folder, pdf_name)
+        plt.savefig(path)
+        print(f"Saved run_cycles_ext plot to {path}")
+
+    plt.show()
+
+def run_cycles(V0, W0, Y0, X0, Z0,
+               W_birth, Y_birth, W_death, Y_death,
+               X_in, Z_in, X_out, Z_out,
+               duration, dt,
+               use_X, use_Z,
+               cycles,
+               severity,
+               perturb_W=False,
+               perturb_Y=False,
+               save_plot=True):
+    """
+    Run 'cycles' successive simulate_segment calls, record final W each cycle,
+    and plot W_final vs. cycle.  If save_plot=True, saves figure into ./run_cycles/.
+    """
+    V_curr, W_curr, Y_curr, X_curr, Z_curr = V0, W0, Y0, X0, Z0
+    W_finals = []
+
+    for _ in range(cycles):
+        _, V_arr, W_arr, Y_arr, X_arr, Z_arr, X_plot, Z_plot = simulate_segment(
+            V_curr, W_curr, Y_curr, X_curr, Z_curr,
+            W_birth, Y_birth, W_death, Y_death,
+            X_in, Z_in, X_out, Z_out,
+            duration, dt,
+            use_X=use_X, use_Z=use_Z,
+            tol=1e-6, stop_at_eq=False
+        )
+        V_final, W_final, Y_final = V_arr[-1], W_arr[-1], Y_arr[-1]
+        W_finals.append(W_final)
+
+        if perturb_W:
+            V_curr, W_curr = (1-severity)*V_final, (1-severity)*W_final
+        else:
+            V_curr, W_curr = V_final, W_final
+        Y_curr = (1-severity)*Y_final if perturb_Y else Y_final
+        X_curr, Z_curr = X_arr[-1], Z_arr[-1]
+
+    cycles_idx = np.arange(1, cycles+1)
+    plt.figure(figsize=(8,5))
+    plt.plot(cycles_idx, W_finals, '-o', color='darkgreen')
+    plt.xlabel('Cycle', fontsize=12)
+    plt.ylabel(r'$W_{\mathrm{final}}$', fontsize=12)
+    plt.title('Final W vs Cycle', fontsize=14)
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Saving
+    if save_plot:
+        folder = "run_cycles"
+        os.makedirs(folder, exist_ok=True)
+        base = "run_cycles"
+        pattern = os.path.join(folder, base + "*.pdf")
+        existing = glob.glob(pattern)
+        if not existing:
+            pdf_name = base + ".pdf"
+        else:
+            taken = set(int(os.path.basename(p).replace(base,"").replace(".pdf","") or 0)
+                        for p in existing if os.path.basename(p).replace(base,"").replace(".pdf","").isdigit() or p.endswith(base+".pdf"))
+            k=0
+            while k in taken:
+                k+=1
+            pdf_name=f"{base}{k}.pdf"
+        path = os.path.join(folder, pdf_name)
+        plt.savefig(path)
+        print(f"Saved run_cycles plot to {path}")
+
+    plt.show()
