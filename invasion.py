@@ -138,7 +138,7 @@ def compute_deltaW_curve(W_birth, Y_birth, W_death, Y_death,
                          X_in, Z_in, X_out, Z_out,
                          Time, dt, use_X, use_Z,
                          num_points, severity,
-                         perturb_V, perturb_W, perturb_Y,
+                          perturb_W, perturb_Y,
                          tol):
     """
     Compute W0_values and corresponding ΔW for a given 'severity',
@@ -165,7 +165,7 @@ def compute_deltaW_curve(W_birth, Y_birth, W_death, Y_death,
         Z0 = (Z_in / Z_out) * Y_eq if use_Z else 0.0
 
         M   = 1.0 - severity
-        V0p = (M * V0)   if perturb_V else V0
+        V0p = (M * V0)   if perturb_W else V0
         W0p = (M * W0)   if perturb_W else W0
         Y0p = (M * Y_eq) if perturb_Y else Y_eq
 
@@ -242,7 +242,7 @@ def compare_severities(W_birth, Y_birth, W_death, Y_death,
             Time=Time, dt=dt, use_X=use_X, use_Z=use_Z,
             num_points=num_points,
             severity=sev,
-            perturb_V=False, perturb_W=perturb_W, perturb_Y=perturb_Y,
+             perturb_W=perturb_W, perturb_Y=perturb_Y,
             tol=tol
         )
 
@@ -353,7 +353,7 @@ def test_plot(W_birth, Y_birth, W_death, Y_death,
               Time=200.0, dt=0.01,
               use_X=True, use_Z=True,
               severity=0.5,
-              perturb_V=False, perturb_W=False, perturb_Y=True,
+               perturb_W=False, perturb_Y=True,
               perturb_time=20.0,
               tol=1e-6):
     """
@@ -402,7 +402,7 @@ def test_plot(W_birth, Y_birth, W_death, Y_death,
     Z_eq_pre = Z_pre_plot[-1] if use_Z else None
 
     # (4) apply perturbation multiplier = (1 - severity)
-    V_mid = ((1 - severity) * V_eq_pre) if perturb_V else V_eq_pre
+    V_mid = ((1 - severity) * V_eq_pre) if perturb_W else V_eq_pre
     W_mid = ((1 - severity) * W_eq_pre) if perturb_W else W_eq_pre
     Y_mid = ((1 - severity) * Y_eq_pre) if perturb_Y else Y_eq_pre
 
@@ -477,4 +477,175 @@ def test_plot(W_birth, Y_birth, W_death, Y_death,
         'delta_W_test': delta_W_test
     }
 
+def compare_scalers(W_birth, Y_birth, W_death, Y_death,
+                       X_in, Z_in, X_out, Z_out, severity,
+                       Time=200.0, dt=0.01,
+                       use_X=True, use_Z=True,
+                       scale_X=True,
+                       num_points=100,
+                       scaler_range=(0.5, 2), n_scaler=5,
+                       perturb_W=False, perturb_Y=True,
+                       tol=1e-6,
+                       verbose=False):
+    """
+    For severities in [scaler_range[0], scaler_range[1]] (n_scaler points),
+    compute ΔW vs W0—but only over the surviving subrange, defined by
+    (W_final + V_final) ≥ 0.1·W_eq.  Plot each truncated curve in reversed viridis,
+    draw a vertical dashed line at each threshold W0_min_surv (if > 0),
+    and save a PDF of the figure into a single folder named 'compare_severities'.
+    All PDFs go into that folder, with integer‐suffix filenames to avoid overwriting.
+    If verbose=False, suppress all print statements.
+    """
+    scalers = np.linspace(scaler_range[0], scaler_range[1], n_scaler)
+    print(scalers) if verbose else None
+
+    try:
+        base_cmap = cm.colormaps['viridis']
+    except AttributeError:
+        base_cmap = cm.get_cmap('viridis')
+    cmap = base_cmap.reversed()
+    norm = mcolors.Normalize(vmin=scaler_range[0], vmax=scaler_range[1])
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    integrals = np.zeros(n_scaler)
+    curves   = []
+    valid_idx = []
+
+    # 1) Compute each ΔW‐curve (truncated) and record its W0_min_surv
+    if scale_X:
+        for i, scals in enumerate(scalers):
+            W0_surv, DeltaW_surv, integral_surv, W0_min_surv = compute_deltaW_curve(
+                W_birth=W_birth, Y_birth=Y_birth,
+                W_death=W_death, Y_death=Y_death,
+                X_in=X_in*scals, Z_in=Z_in, X_out=X_out*scals, Z_out=Z_out,
+                Time=Time, dt=dt, use_X=use_X, use_Z=use_Z,
+                num_points=num_points,
+                severity=severity,
+                perturb_W=perturb_W, perturb_Y=perturb_Y,
+                tol=tol
+            )
+
+            if W0_min_surv is None:
+                if verbose:
+                    print(f"Warning: severity={sev:.3f} → no survivors. Skipping.")
+                curves.append((None, None, None))
+                integrals[i] = 0.0
+                continue
+
+            curves.append((W0_surv, DeltaW_surv, W0_min_surv))
+            integrals[i] = integral_surv
+            valid_idx.append(i)
+    else:
+        for i, scals in enumerate(scalers):
+            W0_surv, DeltaW_surv, integral_surv, W0_min_surv = compute_deltaW_curve(
+                W_birth=W_birth, Y_birth=Y_birth,
+                W_death=W_death, Y_death=Y_death,
+                X_in=X_in, Z_in=Z_in*scals, X_out=X_out, Z_out=Z_out*scals,
+                Time=Time, dt=dt, use_X=use_X, use_Z=use_Z,
+                num_points=num_points,
+                severity=severity,
+                perturb_W=perturb_W, perturb_Y=perturb_Y,
+                tol=tol
+            )
+
+            if W0_min_surv is None:
+                if verbose:
+                    print(f"Warning: severity={sev:.3f} → no survivors. Skipping.")
+                curves.append((None, None, None))
+                integrals[i] = 0.0
+                continue
+
+            curves.append((W0_surv, DeltaW_surv, W0_min_surv))
+            integrals[i] = integral_surv
+            valid_idx.append(i)
+
+    if len(valid_idx) == 0:
+        raise RuntimeError("All scalers lead to extinction; no plot generated.")
+
+    max_int = np.max(integrals[valid_idx])
+    rel_ints = integrals / max_int
+
+    if verbose:
+        print("Scalers   Relative ∫|ΔW| dW₀")
+        for scal, rel in zip(scalers, rel_ints):
+            print(f"{scal:.3f}      {rel:.4f}")
+
+    # 2) Plot each truncated ΔW‐curve plus a vertical line at W0_min_surv (if > 0)
+    for i in valid_idx:
+        scals            = scalers[i]
+        W0_surv, DeltaW_surv, W0_min_surv = curves[i]
+        color          = cmap(norm(scals))
+
+        # 2a) the truncated curve
+        ax.plot(
+            W0_surv, DeltaW_surv,
+            color=color, linewidth=1.8,
+            label=f"scal={scals:.3f}, W₀₋min={W0_min_surv:.4f}"
+        )
+
+        # 2b) vertical line from y=0 up to ΔW_surv[0], only if W0_min_surv > 0
+        if W0_min_surv > 0.0:
+            delta_at_threshold = DeltaW_surv[0]
+            ax.vlines(
+                x=W0_min_surv,
+                ymin=0.0,
+                ymax=delta_at_threshold,
+                color=color,
+                linestyle='--',
+                linewidth=1,
+                alpha=0.7
+            )
+
+    if perturb_W:
+        perturb = "W"
+    else:
+        perturb = "Y"
+    ax.axhline(0.0, color='black', linestyle='--', linewidth=1)
+    ax.set_xlabel(r'$W_{0}$', fontsize=12)
+    ax.set_ylabel(r'$\Delta W$', fontsize=12)
+    ax.set_title(f'ΔW vs W₀ ({perturb} extinction)', fontsize=14)
+    ax.grid(True)
+
+    # 3) Colorbar for Scalers
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, pad=0.02, aspect=30)
+    cbar.set_label('Scalers', fontsize=12)
+
+    # 4) Legend (uncomment if desired)
+    # ax.legend(loc='upper left', fontsize=8, framealpha=0.9, bbox_to_anchor=(1.2, 1))
+
+    plt.tight_layout()
+
+    # --------------------------
+    # 5) Saving logic (all PDFs in the same folder)
+    folder_name = "compare_scalers"
+    os.makedirs(folder_name, exist_ok=True)
+
+    base_pdf = "compare_scalers"
+    pattern = os.path.join(folder_name, base_pdf + "*.pdf")
+    existing_pdfs = glob.glob(pattern)
+    if not existing_pdfs:
+        pdf_name = base_pdf + ".pdf"
+    else:
+        taken = set()
+        for p in existing_pdfs:
+            stem = os.path.basename(p)
+            tail = stem.replace(base_pdf, "").replace(".pdf", "")
+            if tail == "":
+                taken.add(0)
+            elif tail.isdigit():
+                taken.add(int(tail))
+        k = 0
+        while k in taken:
+            k += 1
+        pdf_name = f"{base_pdf}{k}.pdf"
+
+    full_path = os.path.join(folder_name, pdf_name)
+    plt.savefig(full_path)
+    if verbose:
+        print(f"Figure saved to: {full_path}")
+    # --------------------------
+
+    plt.show()
 
