@@ -134,6 +134,118 @@ def simulate_segment(V0, W0, Y0, X0, Z0,
 
     return t_trunc, V_trunc, W_trunc, Y_trunc, X_raw_trunc, Z_raw_trunc, X_plot, Z_plot
 
+def simulate_segment2(V0, W0, Y0, X0, Z0, U0,
+                     W_birth, Y_birth, W_death, Y_death,
+                     X_in, Z_in, X_out, Z_out, U_in, U_out,
+                     duration, dt,
+                     use_X, use_Z,
+                     tol=1e-6,
+                     stop_at_eq=True):
+    """
+    Integrate from t=0 to t=duration with initial conditions
+      V(0)=V0, W(0)=W0, Y(0)=Y0, X(0)=X0, Z(0)=Z0.
+    If stop_at_eq=True, stops early when all |dV|,|dW|,|dY| (and |dX| if use_X, |dZ| if use_Z)
+    fall below tol. Otherwise, always runs full duration.
+    Returns:
+      t_array,
+      V_array, W_array, Y_array,
+      X_raw_array (unscaled), Z_raw_array (unscaled),
+      X_plot = X_raw_array * X_scaler, Z_plot = Z_raw_array * Z_scaler.
+    """
+    X_scaler = X_out / X_in if (use_X and X_in > 0) else 1.0
+    Z_scaler = Z_out / Z_in if (use_Z and Z_in > 0) else 1.0
+
+    N = int(np.ceil(duration / dt)) + 1
+    t = np.linspace(0.0, duration, N)
+    U_raw = np.zeros(N)
+    V = np.zeros(N)
+    W = np.zeros(N)
+    Y = np.zeros(N)
+    X_raw = np.zeros(N)
+    Z_raw = np.zeros(N)
+
+    U_raw[0] = U0
+    V[0] = V0
+    W[0] = W0
+    Y[0] = Y0
+    X_raw[0] = X0
+
+    Z_raw[0] = Z0
+
+    final_index = N - 1
+    for i in range(1, N):
+        Vi = V[i-1]
+        Wi = W[i-1]
+        Yi = Y[i-1]
+        Xi = X_raw[i-1]
+        Zi = Z_raw[i-1]
+        Ui = U_raw[i-1]
+
+        # dV/dt, dW/dt
+        dV = W_birth * (1 - Wi - Vi) * Vi * Yi - W_death * Vi
+        dW = W_birth * (1 - Wi - Vi) * Wi * Yi - W_death * Wi
+
+        # dY/dt
+        dY = Y_birth * (1 - Yi) * Yi * (Vi + Wi) - Y_death * Yi
+
+        # X-coupling
+        if use_X:
+            dW += X_out * Xi - X_in * Wi
+            dW += X_out * Xi - X_in * Wi
+            dV += U_out * Ui - U_in * Vi
+            dV += U_out * Ui - U_in * Vi
+        # Z-coupling
+        if use_Z:
+            dY += Z_out * Zi - Z_in * Yi
+
+        # dX/dt, dZ/dt
+        dX = - X_out * Xi + X_in * Wi
+        dU = - U_out * Ui + U_in * Vi
+        dZ = - Z_out * Zi + Z_in * Yi
+
+
+        # If stop_at_eq=True, check for equilibrium
+        if stop_at_eq:
+            cond = (abs(dV) < tol and abs(dW) < tol and abs(dY) < tol)
+            if use_X:
+                cond &= abs(dX) < tol
+            if use_Z:
+                cond &= abs(dZ) < tol
+            if cond:
+                final_index = i - 1
+                break
+
+        # Euler update
+        V[i] = Vi + dt * dV
+        W[i] = Wi + dt * dW
+        Y[i] = Yi + dt * dY
+        X_raw[i] = Xi + dt * dX
+        Z_raw[i] = Zi + dt * dZ
+        U_raw[i] = Ui + dt * dU
+
+        # Enforce nonnegativity
+        V[i] = max(V[i], 0.0)
+        W[i] = max(W[i], 0.0)
+        Y[i] = max(Y[i], 0.0)
+        X_raw[i] = max(X_raw[i], 0.0)
+        Z_raw[i] = max(Z_raw[i], 0.0)
+        U_raw[i] = max(U_raw[i], 0.0)
+
+    # Truncate arrays
+    t_trunc     = t[: final_index + 1]
+    V_trunc     = V[: final_index + 1]
+    W_trunc     = W[: final_index + 1]
+    Y_trunc     = Y[: final_index + 1]
+    X_raw_trunc = X_raw[: final_index + 1]
+    Z_raw_trunc = Z_raw[: final_index + 1]
+    U_raw_trunc = U_raw[: final_index + 1]
+
+    X_plot = X_raw_trunc * X_scaler
+    Z_plot = Z_raw_trunc * Z_scaler
+    U_plot = U_raw_trunc * X_scaler
+
+    return t_trunc, V_trunc, W_trunc, Y_trunc, X_raw_trunc, Z_raw_trunc, U_raw_trunc, X_plot, Z_plot, U_plot
+
 def compute_deltaW_curve(W_birth, Y_birth, W_death, Y_death,
                          X_in, Z_in, X_out, Z_out,
                          Time, dt, use_X, use_Z,
@@ -493,7 +605,7 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
     (W_final + V_final) ≥ 0.1·W_eq.  Plot each truncated curve in reversed viridis,
     draw a vertical dashed line at each threshold W0_min_surv (if > 0),
     and save a PDF of the figure into a single folder named 'compare_severities'.
-    All PDFs go into that folder, with integer‐suffix filenames to avoid overwriting.
+    All PDFs go into that folder, with integersuffix filenames to avoid overwriting.
     If verbose=False, suppress all print statements.
     """
     scalers = np.linspace(scaler_range[0], scaler_range[1], n_scaler)
@@ -526,8 +638,7 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
             )
 
             if W0_min_surv is None:
-                if verbose:
-                    print(f"Warning: severity={sev:.3f} → no survivors. Skipping.")
+
                 curves.append((None, None, None))
                 integrals[i] = 0.0
                 continue
@@ -549,8 +660,6 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
             )
 
             if W0_min_surv is None:
-                if verbose:
-                    print(f"Warning: severity={sev:.3f} → no survivors. Skipping.")
                 curves.append((None, None, None))
                 integrals[i] = 0.0
                 continue
@@ -839,3 +948,107 @@ def run_cycles(V0, W0, Y0, X0, Z0,
         print(f"Saved run_cycles plot to {path}")
 
     plt.show()
+
+def run_invasion(V0, W0, Y0, X0, Z0, U0,
+               W_birth, Y_birth, W_death, Y_death,
+               X_in, Z_in, X_out, Z_out, U_in, U_out,
+               extinction_rate, dt,
+               use_X, use_Z,
+               cycles,
+               severity,
+               perturb_W=False,
+               perturb_Y=False,
+               save_plot=True):
+    """
+    Run 'cycles' successive calls to simulate_segment, each time:
+      1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
+      2) record final V, W, Y
+      3) if perturb_W: set W0_next = (1-severity)*W_final and
+                         V0_next = (1-severity)*V_final
+      4) if perturb_Y: set Y0_next = (1-severity)*Y_final
+      5) X0_next = X_final, Z0_next = Z_final
+    After all cycles, plot cycle index vs final W, V, and Y.
+    Returns lists of final values [V_finals, W_finals, Y_finals].
+    """
+    V_curr, W_curr, Y_curr, X_curr, Z_curr, U_curr = V0, W0, Y0, X0, Z0, U0
+    V_finals = []
+    W_finals = []
+    Y_finals = []
+
+    for n in range(1, cycles+1):
+        # 1) simulate one segment
+        t_arr, V_arr, W_arr, Y_arr, X_arr, Z_arr, U_arr, X_plot, Z_plot, U_plot = simulate_segment2(
+            V_curr, W_curr, Y_curr, X_curr, Z_curr, U_curr,
+            W_birth, Y_birth, W_death, Y_death,
+            X_in, Z_in, X_out, Z_out, U_in, U_out,
+            extinction_rate, dt,
+            use_X, use_Z,
+            tol=1e-6,
+            stop_at_eq=False
+        )
+
+        # 2) record finals
+        U_final = U_arr[-1]
+        V_final = V_arr[-1]
+        W_final = W_arr[-1]
+        Y_final = Y_arr[-1]
+        V_finals.append(V_final)
+        W_finals.append(W_final)
+        Y_finals.append(Y_final)
+
+        # 3) perturb for next cycle
+        if perturb_W:
+            V_curr = (1 - severity) * V_final
+            W_curr = (1 - severity) * W_final
+        else:
+            V_curr = V_final
+            W_curr = W_final
+
+        if perturb_Y:
+            Y_curr = (1 - severity) * Y_final
+        else:
+            Y_curr = Y_final
+
+        # 4) carry over X, Z unchanged
+        X_curr = X_arr[-1]
+        Z_curr = Z_arr[-1]
+        U_curr = U_arr[-1]
+
+    # plot all three on one figure
+    cycles_idx = np.arange(1, cycles+1)
+    plt.figure(figsize=(8, 5))
+    plt.plot(cycles_idx, W_finals, label='W final', color='darkgreen')
+    plt.plot(cycles_idx, V_finals, label='V final', color='orange')
+    plt.plot(cycles_idx, Y_finals, label='Y final', color='darkblue')
+    plt.xlabel('Cycle', fontsize=12)
+    plt.ylabel('Final Value', fontsize=12)
+    plt.title(f'Final V, W, Y after each cycle\n(severity={severity}, perturb_W={perturb_W}, perturb_Y={perturb_Y})', fontsize=14)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Saving
+    if save_plot:
+        folder = "run_cycles"
+        os.makedirs(folder, exist_ok=True)
+        base = "run_cycles"
+        pattern = os.path.join(folder, base + "*.pdf")
+        existing = glob.glob(pattern)
+        if not existing:
+            pdf_name = base + ".pdf"
+        else:
+            taken = set(int(os.path.basename(p).replace(base,"").replace(".pdf","") or 0)
+                        for p in existing if os.path.basename(p).replace(base,"").replace(".pdf","").isdigit() or p.endswith(base+".pdf"))
+            k=0
+            while k in taken:
+                k+=1
+            pdf_name=f"{base}{k}.pdf"
+        path = os.path.join(folder, pdf_name)
+        plt.savefig(path)
+        print(f"Saved run_cycles plot to {path}")
+
+    plt.show()
+
+
+
+

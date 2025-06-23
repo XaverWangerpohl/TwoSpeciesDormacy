@@ -1,0 +1,12 @@
+model birth_death()
+  // Species with initial amounts
+  X = 100
+
+  // Kinetic parameters
+  lambda = 0.75
+  mu     = 0.25
+
+  // Elementary reactions
+  J_birth:    => X;       lambda * X
+  J_death:    X => ;      mu     * X
+end
