@@ -1089,7 +1089,8 @@ def run_invasion(V0, W0, Y0,
                perturb_W=False,
                perturb_Y=False,
                plot=False,
-               stop=None):
+               stop=None,
+               break_threshold=0.01):
     """
     Run 'cycles' successive calls to simulate_segment, each time:
       1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
@@ -1104,7 +1105,7 @@ def run_invasion(V0, W0, Y0,
     """
     X0 = W0 / (X_out / X_in)
     U0 = V0 / (U_out / U_in)
-    Z0 = Y0/ (Z_out /Z_in)
+    Z0 = Y0 / (Z_out /Z_in)
     V_curr, W_curr, Y_curr, X_curr, Z_curr, U_curr = V0, W0, Y0, X0, Z0, U0
     V_finals = []
     W_finals = []
@@ -1131,8 +1132,11 @@ def run_invasion(V0, W0, Y0,
         V_finals.append(V_final)
         W_finals.append(W_final)
         Y_finals.append(Y_final)
+
+        if n == 50:
+            W0 = W_final
         
-        if abs(W_final - W0) > .01:
+        if (abs(W_final - W0) > break_threshold) and n > 50:
             break
 
         # 3) perturb for next cycle
@@ -1163,8 +1167,14 @@ def run_invasion(V0, W0, Y0,
         plt.plot(cycles_idx, V_finals, label='V final', color='orange')
         plt.plot(cycles_idx, Y_finals, label='Y final', color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
-        plt.ylabel('Final Value', fontsize=12)
-        plt.title(f'Final V, W, Y after each cycle\n(severity={severity}, perturb_W={perturb_W}, perturb_Y={perturb_Y})', fontsize=14)
+        plt.ylabel('Density', fontsize=12)
+        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr += ', W Perturbed, ' if perturb_W else ''
+        titlestr += ', Y perturbed, ' if perturb_Y else ''
+        titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
+            U_in, U_out, X_in, X_out)
+        plt.title(titlestr, fontsize=14)
+
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
@@ -1191,6 +1201,47 @@ def run_invasion(V0, W0, Y0,
 
         plt.show()
     return W_final - W0
+
+def test_invasion(
+    U_in_vals, U_out_vals, deltas, test_point,
+    V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+):
+    X_vals = [
+    (U_in_vals[k], U_out_vals[l])
+    for ((i, j), (k, l)), v in deltas.items()
+    if (i == test_point[0] and j == test_point[1])
+    ]
+    
+    U_vals = [
+    U_in_vals[test_point[0]], U_out_vals[test_point[1]]]
+
+    U_in, U_out = U_vals
+
+    for Xs in X_vals:
+        X_in, X_out = Xs
+        
+        run_invasion(
+            V0, W0, Y0,
+            W_birth, Y_birth,
+            W_death, Y_death,
+            X_in, X_out,
+            U_in, U_out,
+            Z_in, Z_out,
+            extinction_rate, dt,
+            use_X, use_Z,
+            severity,
+            cycles=cycles,
+            perturb_W=False,
+            perturb_Y=True,
+            plot=True
+        )
+  
+    return X_vals, U_vals
 
 def pairwise_invasion_plot(
     V0, W0, Y0, 
@@ -1561,6 +1612,153 @@ def piplot2(
 
     return U_vals, X_vals, deltaW_matrix
 
+def global_invasability(
+    V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size,
+    U_in=0.1, U_out=0.1,
+    X_in_range = 0.1,
+    X_out_range = 0.1,
+    perturb_W=False, perturb_Y=True, speedplot=False, break_threshold=0.01
+
+):
+    """
+    Generate a pairwise invasion plot (PIP) over U_in (x-axis) and X_in (y-axis).
+    Uses X_out = X_in and U_out = U_in for each grid point.
+    Only computes for X_in >= U_in and mirrors symmetry.
+    Saves both continuous ΔW heatmap and binary invasion/failure plot without overwriting.
+    """
+    # Prepare output folder
+    folder = 'invasion_plots'
+    os.makedirs(folder, exist_ok=True)
+
+    X_in_vals = np.linspace(U_in-X_in_range, U_in + X_in_range, grid_size)
+    X_out_vals = np.linspace(U_out-X_out_range, U_out + X_out_range, grid_size)
+    deltaW_matrix = np.zeros((grid_size, grid_size))
+
+    for i, X_in in enumerate(tqdm(X_in_vals, desc="Scanning X_in")):
+        for j, X_out in enumerate(X_out_vals):
+            # Mirror diagonal
+            if (j == i) and (i == grid_size // 2):
+                deltaW_matrix[j, i] = 0.0
+                continue
+
+            # Compute ΔW via run_invasion
+            deltaW = run_invasion(
+                        V0=V0, W0=W0, Y0=Y0,
+                        W_birth=W_birth, Y_birth=Y_birth,
+                        W_death=W_death, Y_death=Y_death,
+                        X_in=X_in, X_out=X_out,
+                        U_in=U_in,U_out=U_out,
+                        Z_in=Z_in, Z_out=Z_out,
+                        extinction_rate=extinction_rate, dt=dt,
+                        use_X=use_X, use_Z=use_Z,
+                        cycles=cycles, severity=severity,
+                        perturb_W=perturb_W, perturb_Y=perturb_Y,
+                        plot=False)
+            deltaW_matrix[j, i] = deltaW
+    # Compute the mesh edges so that each cell of pcolormesh
+    # spans exactly between successive sample points.
+    X_edges = np.linspace(U_in - X_in_range, U_in + X_in_range, grid_size + 1)
+    Y_edges = np.linspace(U_out - X_out_range, U_out + X_out_range, grid_size + 1)
+
+    if speedplot:
+        # Determine next index and filename as before...
+        cont_pattern = os.path.join(folder, 'pip_speed*.pdf')
+        existing_cont = glob.glob(cont_pattern)
+        cont_idxs = [int(m.group(1)) if (m := re.match(r'.*pip_speed(\d*)\.pdf$', os.path.basename(p))) else 0
+                     for p in existing_cont]
+        next_cont = max(cont_idxs) + 1 if cont_idxs else 0
+        cont_fname = f'pip_speed{next_cont}.pdf'
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        # Use pcolormesh so that grid cells align with sample points:
+        mesh = ax.pcolormesh(
+            X_edges, Y_edges, deltaW_matrix,
+            shading='flat',      # no smoothing
+            cmap='RdBu_r',       # diverging colormap, for example
+            vmin=np.min(deltaW_matrix),
+            vmax=np.max(deltaW_matrix)
+        )
+
+        # Draw gridlines between cells:
+        ax.set_xticks(X_edges, minor=True)
+        ax.set_yticks(Y_edges, minor=True)
+        ax.grid(which='minor', color='black', linewidth=0.5)
+
+        # Place major ticks at the center of each cell:
+        ax.set_xticks((X_edges[:-1] + X_edges[1:]) / 2)
+        ax.set_yticks((Y_edges[:-1] + Y_edges[1:]) / 2)
+        ax.set_xticklabels([f"{x:.2f}" for x in (X_edges[:-1] + X_edges[1:]) / 2], rotation=90)
+        ax.set_yticklabels([f"{y:.2f}" for y in (Y_edges[:-1] + Y_edges[1:]) / 2])
+
+        ax.set_xlabel('U_in')
+        ax.set_ylabel('X_in')
+        ax.set_title(f'Pairwise Invasion Plot: ΔW after {cycles} cycles')
+        cbar = fig.colorbar(mesh, ax=ax, label='ΔW (positive: invasion; negative: failure)')
+
+        plt.tight_layout()
+        fig.savefig(os.path.join(folder, cont_fname), format='pdf')
+        plt.show()
+
+    # —— Binary plot —— #
+
+    # Binary plot: determine next filename index
+    bin_pattern = os.path.join(folder, 'pip*.pdf')
+    existing_bin = glob.glob(bin_pattern)
+    bin_idxs = []
+    for p in existing_bin:
+        m = re.match(r'.*pip(\d*)\.pdf$', os.path.basename(p))
+        if m:
+            idx = int(m.group(1)) if m.group(1) else 0
+            bin_idxs.append(idx)
+    next_bin = max(bin_idxs) + 1 if bin_idxs else 0
+    bin_fname = f'pip{next_bin}.pdf'
+
+
+    # Build category matrix (0,1,2)…
+    category = np.zeros_like(deltaW_matrix, dtype=int)
+    category[deltaW_matrix <  0] = 0
+    category[deltaW_matrix == 0] = 1
+    category[deltaW_matrix >  0] = 2
+    cmap = ListedColormap(['white', 'black', 'gray'])
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Again, use pcolormesh for perfect alignment:
+    mesh2 = ax.pcolormesh(
+        X_edges, Y_edges, category,
+        shading='flat',
+        cmap=cmap,
+        vmin=0, vmax=2
+    )
+
+    # Gridlines:
+    ax.set_xticks(X_edges, minor=True)
+    ax.set_yticks(Y_edges, minor=True)
+    ax.grid(which='minor', color='black', linewidth=0.5)
+
+    # Major ticks centered:
+    ax.set_xticks((X_edges[:-1] + X_edges[1:]) / 2)
+    ax.set_yticks((Y_edges[:-1] + Y_edges[1:]) / 2)
+    ax.set_xticklabels([f"{x:.2f}" for x in (X_edges[:-1] + X_edges[1:]) / 2], rotation=90)
+    ax.set_yticklabels([f"{y:.2f}" for y in (Y_edges[:-1] + Y_edges[1:]) / 2])
+
+    ax.set_xlabel('Mutant Seedbank in Rate')
+    ax.set_ylabel('Mutant Seedbank out Rate')
+    ax.set_title('Invasion (gray) and Extinction (white) of Mutant')
+
+    plt.tight_layout()
+    fig.savefig(os.path.join(folder, bin_fname), format='pdf')
+    plt.show()
+
+    return X_in_vals, X_out_vals, deltaW_matrix
+
 def local_invasibility_heatmap(
     V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
@@ -1661,7 +1859,7 @@ def local_invasibility_heatmap(
     )
     plt.xlabel('U_in')
     plt.ylabel('U_out')
-    plt.title('Local invasibility (mean sign of ΔW among 8 neighbors)')
+    plt.title('Local invasibility (Number if invading neighbors)')
     cbar = plt.colorbar(im, ticks=np.arange(0, 5, 1), boundaries=bounds)
     cbar.set_label('Count of invading neighbors')
     plt.tight_layout()
@@ -1675,7 +1873,6 @@ def local_invasibility_heatmap(
 
     # 7) Return for further use
     return U_in_vals, U_out_vals, score, deltas
-
 
 def local_invasibility_path(
     V0, W0, Y0, 
@@ -1763,6 +1960,11 @@ def local_invasibility_path(
                        
 
     return U_in_vals, U_out_vals, score, deltas
+
+
+
+
+
 
 
 
