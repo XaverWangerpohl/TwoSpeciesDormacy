@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.colors import ListedColormap, BoundaryNorm
-import warnings
 from tqdm import tqdm
 import re
+from operator import itemgetter
 
 def compute_nontrivial_slice(W_birth, W_death, Y_birth, Y_death):
     """
@@ -1106,7 +1106,9 @@ def run_invasion(V0, W0, Y0,
     X0 = W0 / (X_out / X_in)
     U0 = V0 / (U_out / U_in)
     Z0 = Y0 / (Z_out /Z_in)
+
     V_curr, W_curr, Y_curr, X_curr, Z_curr, U_curr = V0, W0, Y0, X0, Z0, U0
+
     V_finals = []
     W_finals = []
     Y_finals = []
@@ -1129,6 +1131,7 @@ def run_invasion(V0, W0, Y0,
         V_final = V_arr[-1]
         W_final = W_arr[-1]
         Y_final = Y_arr[-1]
+        
         V_finals.append(V_final)
         W_finals.append(W_final)
         Y_finals.append(Y_final)
@@ -1216,6 +1219,7 @@ def test_invasion(
     for ((i, j), (k, l)), v in deltas.items()
     if (i == test_point[0] and j == test_point[1])
     ]
+    X_vals = sorted(X_vals, key=itemgetter(0, 1))
     
     U_vals = [
     U_in_vals[test_point[0]], U_out_vals[test_point[1]]]
