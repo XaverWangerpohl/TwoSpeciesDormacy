@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.colors import ListedColormap, BoundaryNorm
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import re
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 
 
 
@@ -190,7 +191,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
               severity=0.5,
               perturb_W=False, perturb_Y=True,
               perturb_time=20.0,
-              tol=1e-7):
+              tol=1e-7, plot_Y=False):
     """
     Build a time-series plot for a fixed W0 using perturbation multiplier = (1 - severity).
     1) Compute (W_eq, Y_eq).
@@ -257,27 +258,35 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
 
     delta_W_test = W_final - W_eq_pre
 
+    X_scaler = X_out/X_in
+    U_scaler = U_out/U_in
+
+
     # Time-series plot
     plt.figure(figsize=(8, 5))
     if use_X:
-        plt.plot(t_full, X_full, label=r'$X(t)$', color='lime', linewidth=1.5)
-        plt.plot(t_full, U_full, label=r'$U(t)$', color='gold', linewidth=1.5)
-    plt.plot(t_full, Y_full, label=r'$Y(t)$', color='darkblue', linewidth=1.5)
+        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} 'r'$X(t)$ (seedbank of W)', color='lime', linewidth=1.5)
+        plt.plot(t_full, U_full, label=f'{U_scaler:.1f} 'r'$U(t)$ (seedbank of V)', color='gold', linewidth=1.5)
+    if plot_Y:
+        plt.plot(t_full, Y_full, label=r'$Y(t)$', color='darkblue', linewidth=1.5)
     plt.plot(t_full, V_full, label=r'$V(t)$', color='orange', linewidth=1.5)
     plt.plot(t_full, W_full, label=r'$W(t)$', color='darkgreen', linewidth=1.5)
+
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        f'Time Series at $W_{0} = {W0:.4f}$ (severity={severity:.2f})\n'
-        + rf'$\Delta W_{{\mathrm{{test}}}} = {delta_W_test:.4f}$',
+        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $Y$ (latent)' + '\n'
+        + rf'$\Delta W = {delta_W_test:.4f}$',
         fontsize=14
     )
-    plt.legend(loc='upper right', fontsize=9)
+    plt.legend(loc='best', fontsize=9)
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig('/Users/xaverwangerpohl/Documents/GitHub/master-code/SegmentPlots/segment.pdf', format='pdf')
     plt.show()
+    
 
     return 
 
@@ -292,10 +301,10 @@ def run_invasion(V0, W0, Y0,
                severity,
                cycles=10000,
                perturb_W=False,
-               perturb_Y=False,
+               perturb_Y=True,
                plot=False,
                stop=None,
-               break_threshold=0.01):
+               break_threshold=0.01, show_Y=False):
     """
     Run 'cycles' successive calls to simulate_segment, each time:
       1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
@@ -342,7 +351,7 @@ def run_invasion(V0, W0, Y0,
         V_final = V[-1]
         W_final = W[-1]
         Y_final = Y[-1]
-        
+
         V_finals.append(V_final)
         W_finals.append(W_final)
         Y_finals.append(Y_final)
@@ -381,7 +390,8 @@ def run_invasion(V0, W0, Y0,
         plt.figure(figsize=(8, 5))
         plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
         plt.plot(cycles_idx, V_finals, label='V', color='orange')
-        plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
+        if show_Y:
+            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
         titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
@@ -563,6 +573,7 @@ def local_invasibility(V0, W0, Y0,
     
     # deltas is the dictionary, which stores all the considered combination of invasion parameters and weather they succeed
     deltas = {}
+    argsdict = {}
 
     # 5) Loop over interior points (border does not have all the neighbours)
     for i in tqdm(range(1, grid_size-1), desc="Computing local invasibility"):
@@ -574,22 +585,28 @@ def local_invasibility(V0, W0, Y0,
                 X_in = U_in_vals[i+di]
                 X_out = U_out_vals[j+dj]
                 # check weather the invasion has already been computed (antisymmetric if W invades V, V is invaded by W)
+                
                 if ((i+di,j+dj), (i,j)) in deltas.keys():
                     if deltas[((i+di,j+dj), (i,j))] == -1:
                         invasions += 1
                 else:
-                    
-                    deltaW = run_invasion(V0=V0, W0=W0, Y0=Y0,
-                        W_birth=W_birth, Y_birth=Y_birth,
-                        W_death=W_death, Y_death=Y_death,
-                        X_in=X_in, X_out=X_out,
-                        U_in=U_in_vals[i],U_out=U_in_vals[j],
-                        Z_in=Z_in, Z_out=Z_out,
-                        extinction_rate=extinction_rate, dt=dt,
-                        use_X=use_X, use_Z=use_Z,
-                        cycles=cycles, severity=severity,
-                        perturb_W=False, perturb_Y=True,
-                        plot=False, break_threshold=break_threshold
+                
+                    args = {
+                    "V0": V0, "W0": W0, "Y0": Y0,
+                    "W_birth": W_birth, "Y_birth": Y_birth,
+                    "W_death": W_death, "Y_death": Y_death,
+                    "X_in": X_in, "X_out": X_out,
+                    "U_in": U_in_vals[i], "U_out": U_out_vals[j],
+                    "Z_in": Z_in, "Z_out": Z_out,
+                    "extinction_rate": extinction_rate, "dt": dt,
+                    "use_X": use_X, "use_Z": use_Z,
+                    "cycles": cycles, "severity": severity,
+                    "perturb_W": False, "perturb_Y": True,
+                    "plot": False, "break_threshold": break_threshold
+                    }
+                    argsdict[((i,j), (i+di,j+dj))] = args
+                
+                    deltaW = run_invasion(**args
                     )
                     # save findings to deltas
                     if deltaW> 0: # W can invade V  
@@ -621,7 +638,7 @@ def local_invasibility(V0, W0, Y0,
     # 6) Plot the result 
     plt.figure(figsize=(9,8))
     im = plt.imshow(
-        score_masked,
+        score_masked.T,
         origin='lower',
         extent=[U_in_min, U_in_max, U_out_min, U_out_max],
         aspect='auto',
@@ -660,6 +677,7 @@ def local_invasibility(V0, W0, Y0,
     fname = os.path.join(folder, f'local_inv{idx}.pdf')
     plt.savefig(fname)
     plt.show()
+    return U_in_vals, U_out_vals, score, deltas, argsdict
 
 def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,
                   
@@ -701,3 +719,132 @@ def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,
         )
   
     return X_vals, U_vals
+
+def reconstruct_and_flow_map(
+    signs,
+    x_vals,
+    y_vals,
+    folder='surface_flow',
+    arrow_scale=20,
+    invert=False
+):
+    """
+    Reconstruct the scalar field f from sign data on a custom grid,
+    compute its gradient, plot a quiver (flow) map of the gradient vectors
+    with adjustable arrow length, and overlay markers at every tested data point.
+
+    Parameters
+    ----------
+    signs : dict
+        Mapping edge tuples ((i,j),(ii,jj)) to sign values (+1 or -1).
+        Indices i in [0, len(x_vals)), j in [0, len(y_vals)).
+    x_vals : Sequence[float]
+        1D array of x-coordinates (length Nx).
+    y_vals : Sequence[float]
+        1D array of y-coordinates (length Ny).
+    folder : str
+        Directory to save the PDF of the flow map.
+    arrow_scale : float
+        Controls arrow length (smaller → longer).
+    invert : bool
+        If True, flip arrow directions (for sign convention).
+
+    Returns
+    -------
+    f : np.ndarray, shape (Nx, Ny)
+        Reconstructed scalar field.
+    fx, fy : np.ndarray, shape (Nx, Ny)
+        Partial derivatives ∂f/∂x and ∂f/∂y on the grid.
+    """
+    os.makedirs(folder, exist_ok=True)
+    Nx = len(x_vals)
+    Ny = len(y_vals)
+    M = Nx * Ny
+    idx = lambda i, j: i * Ny + j
+
+    # Build sparse Laplacian and RHS g
+    rows, cols, data = [], [], []
+    g = np.zeros(M)
+    offsets = [(1,0), (-1,0), (0,1), (0,-1)]
+
+    for i in trange(Nx, desc='Building Laplacian'):
+        for j in range(Ny):
+            n = idx(i, j)
+            deg = 0
+            for di, dj in offsets:
+                ii, jj = i + di, j + dj
+                if 0 <= ii < Nx and 0 <= jj < Ny:
+                    deg += 1
+                    rows.append(n); cols.append(idx(ii, jj)); data.append(-1)
+                    g[n] += signs.get(((i, j), (ii, jj)), 0)
+            rows.append(n); cols.append(n); data.append(deg)
+
+    L = sp.coo_matrix((data, (rows, cols)), shape=(M, M)).tocsr()
+    L[0, :] = 0; L[0, 0] = 1; g[0] = 0
+
+    # Solve for f
+    f_vec = spla.spsolve(L, g)
+    f = f_vec.reshape((Nx, Ny))
+
+    # Compute gradient with non-uniform spacing
+    fx, fy = np.gradient(f, x_vals, y_vals, edge_order=2)
+
+    # Create meshgrid for plotting
+    X, Y = np.meshgrid(x_vals, y_vals, indexing='ij')
+
+    # Normalize vectors and optionally invert
+    speed = np.hypot(fx, fy)
+    fx_n = fx / (speed + 1e-8)
+    fy_n = fy / (speed + 1e-8)
+    if invert:
+        fx_n, fy_n = -fx_n, -fy_n
+
+    # Collect every tested data point (nodes)
+    tested_nodes = set()
+    for (i_j, ii_jj) in signs.keys():
+        i, j = i_j
+        ii, jj = ii_jj
+        if 0 <= i < Nx and 0 <= j < Ny:
+            tested_nodes.add((i, j))
+        if 0 <= ii < Nx and 0 <= jj < Ny:
+            tested_nodes.add((ii, jj))
+
+    tested_x = [x_vals[i] for (i, _) in tested_nodes]
+    tested_y = [y_vals[j] for (_, j) in tested_nodes]
+
+    # Plot quiver + tested data points
+    fig, ax = plt.subplots(figsize=(10, 10))
+    q = ax.quiver(
+        X, Y, fx_n, fy_n,
+        speed,
+        scale=arrow_scale,
+        cmap='inferno',
+        pivot='mid'
+    )
+    #cbar = fig.colorbar(q, ax=ax)
+    #cbar.set_label('|∇f| (vector magnitude)')
+
+    ax.set_xlabel('U in')
+    ax.set_ylabel('U out')
+    ax.set_title('Flow Map with Tested Data Points')
+    ax.legend()
+    plt.tight_layout()
+
+    # Save PDF
+    pdf_path = os.path.join(folder, 'flow_map_tested_points.pdf')
+    fig.savefig(pdf_path)
+    plt.show()
+    print(f"Saved flow map with tested data points to {pdf_path}")
+
+    predicted_signs = {}
+    for ((i, j), (ii, jj)), true_sign in signs.items():
+        if 0 <= i < Nx and 0 <= j < Ny and 0 <= ii < Nx and 0 <= jj < Ny:
+            if invert:
+                df = -f[ii, jj] + f[i, j]
+            else:
+                df = f[ii, jj] - f[i, j]
+            sign = np.sign(df)
+            if sign != 0:  # optional: ignore zero gradients
+                predicted_signs[((i, j), (ii, jj))] = int(sign)
+
+    return predicted_signs

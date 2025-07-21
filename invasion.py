@@ -1090,7 +1090,7 @@ def run_invasion(V0, W0, Y0,
                perturb_Y=False,
                plot=False,
                stop=None,
-               break_threshold=0.01):
+               break_threshold=0.1):
     """
     Run 'cycles' successive calls to simulate_segment, each time:
       1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
@@ -1763,121 +1763,6 @@ def global_invasability(
 
     return X_in_vals, X_out_vals, deltaW_matrix
 
-def local_invasibility_heatmap(
-    V0, W0, Y0, 
-    W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
-    extinction_rate, dt,
-    use_X, use_Z,
-    cycles, severity,
-    grid_size=5,
-    U_in_min=0.01, U_in_max=0.4,
-    U_out_min=0.01, U_out_max=0.4,
-    folder='total_invasibility',
-):
-    """
-    For each interior gridpoint (i,j) on [0,1]^2 in U_in, X_in:
-      • Evaluate run_invasion at its 8 nearest neighbors
-      • Compute mean of their np.sign(deltaW)
-      • Plot that in grayscale (1=black…+1=white)
-    """
-
-    # 1) Prepare output directory
-    os.makedirs(folder, exist_ok=True)
-
-    # 2) Build the [0,1] grid
-    U_in_vals = np.linspace(U_in_min, U_in_max, grid_size)
-    U_out_vals = np.linspace(U_out_min, U_out_max, grid_size)
-
-    # 3) Initialize the score matrix
-    score = np.zeros((grid_size, grid_size))
-
-    # 4) Offsets for the eight neighbors
-    neighbor_offsets = [         (-1,0),       
-                        ( 0,-1),         ( 0,1),
-                                 ( 1,0),       ]
-    deltas = {}
-    # 5) Loop over interior points
-    for i in tqdm(range(1, grid_size-1), desc="Computing local invasibility"):
-        for j in range(1, grid_size-1):
-            invasions = 0
-            for di, dj in neighbor_offsets:
-                X_in = U_in_vals[i+di]
-                X_out = U_out_vals[j+dj]
-
-                if ((i+di,j+dj), (i,j)) in deltas.keys():
-                    if deltas[((i+di,j+dj), (i,j))] == -1:
-                        invasions += 1
-                else:
-                    # Here we keep X_out = X_in and U_out = U_in for simplicity
-                    deltaW = run_invasion(
-
-                         V0=V0, W0=W0, Y0=Y0,
-                        W_birth=W_birth, Y_birth=Y_birth,
-                        W_death=W_death, Y_death=Y_death,
-                        X_in=X_in, X_out=X_out,
-                        U_in=U_in_vals[i],U_out=U_in_vals[j],
-                        Z_in=Z_in, Z_out=Z_out,
-                        extinction_rate=extinction_rate, dt=dt,
-                        use_X=use_X, use_Z=use_Z,
-                        cycles=cycles, severity=severity,
-                        perturb_W=False, perturb_Y=True,
-                        plot=False,
-
-    
-                    )
-                    if deltaW> 0:
-                        invasions += 1
-                        deltas[((i,j), (i+di,j+dj))] = 1
-                        deltas[((i+di,j+dj), (i,j))] = -1
-                    else:
-                        deltas[((i,j), (i+di,j+dj))] = -1
-                        deltas[((i+di,j+dj), (i,j))] = 1
-
-                # store the mean sign ∈ [–1,+1]
-            score[i, j] = invasions
-
-    # 6) Plot the result as a grayscale PDF
-    #    –1 → black; +1 → white
-    mask = np.zeros_like(score, dtype=bool)
-    mask[ 0, :] = True   # top row
-    mask[-1, :] = True   # bottom row
-    mask[:,  0] = True   # left column
-    mask[:, -1] = True   # right column
-    score_masked = np.ma.array(score, mask=mask)
-
-    cmap = plt.get_cmap('Greens', 5)
-    cmap.set_bad(color='white') 
-
-    # 2. Create a norm that bins values 0–8 into 9 discrete intervals.
-    bounds = np.arange(-0.5, 5.5, 1)     # edges at -0.5, 0.5, 1.5, …, 8.5
-    norm   = BoundaryNorm(bounds, cmap.N)
-    plt.figure(figsize=(9,8))
-    im = plt.imshow(
-        score_masked,
-        origin='lower',
-        extent=[U_in_min, U_in_max,U_out_min,U_out_max],
-        aspect='auto',
-        cmap=cmap,
-        norm=norm
-    )
-    plt.xlabel('U_in')
-    plt.ylabel('U_out')
-    plt.title('Local invasibility (Number if invading neighbors)')
-    cbar = plt.colorbar(im, ticks=np.arange(0, 5, 1), boundaries=bounds)
-    cbar.set_label('Count of invading neighbors')
-    plt.tight_layout()
-
-    # save a new file without overwriting
-    existing = sorted([p for p in os.listdir(folder) if p.startswith('local_inv') and p.endswith('.pdf')])
-    idx = int(re.search(r'\d+', existing[-1]).group())+1 if existing else 0
-    fname = os.path.join(folder, f'local_inv{idx}.pdf')
-    plt.savefig(fname)
-    plt.show()
-
-    # 7) Return for further use
-    return U_in_vals, U_out_vals, score, deltas
-
 def local_invasibility_path(
     V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
@@ -1965,9 +1850,235 @@ def local_invasibility_path(
 
     return U_in_vals, U_out_vals, score, deltas
 
+def local_invasibility2(V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=5,
+    U_in_min=0.01, U_in_max=0.4,
+    U_out_min=0.01, U_out_max=0.4,
+    folder='local_invasibility',
+    break_threshold=0.01
+):
+    """
+    For each interior gridpoint (i,j) on the plane U_in, U_out:
+      • Evaluate run_invasion at its 4 nearest neighbors
+      • Compute mean of their np.sign(deltaW)
+      • Plot 
+    """
+
+    # 1) Prepare output directory
+    os.makedirs(folder, exist_ok=True)
+
+    # 2) Build the 2d grid
+    U_in_vals = np.linspace(U_in_min, U_in_max, grid_size)
+    U_out_vals = np.linspace(U_out_min, U_out_max, grid_size)
+
+    # 3) Initialize the score matrix
+    score = np.empty((grid_size, grid_size), dtype=object)
+    for i in range(grid_size):
+        for j in range(grid_size):
+            score[i, j] = np.array((0, 0, 0, 0))
+
+    # 4) Offsets for the neighbors
+    neighbour_dict = {
+        (0,1) :np.array((1,0,0,0)),
+        (0,-1):np.array((0,1,0,0)),
+        (1,0) :np.array((0,0,1,0)),
+        (-1,0):np.array((0,0,0,1))
+    }  
+    
+    # deltas is the dictionary, which stores all the considered combination of invasion parameters and weather they succeed
+    deltas = {}
+
+
+    # 5) Loop over interior points (border does not have all the neighbours)
+    for i in tqdm(range(1, grid_size-1), desc="Computing local invasibility"):
+        for j in range(1, grid_size-1):
+            # invasions counts, how many neighbours can invade
+            invasions = np.array((0,0,0,0))
+            # loop over the neighbours
+            for (di,dj), v in neighbour_dict.items():
+
+                X_in = U_in_vals[i+di]
+                X_out = U_out_vals[j+dj]
+                # check weather the invasion has already been computed (antisymmetric if W invades V, V is invaded by W)
+                if ((i+di,j+dj), (i,j)) in deltas.keys():
+                    if deltas[((i+di,j+dj), (i,j))] == -1:
+                        invasions = invasions + v
+                else:
+                    
+                    deltaW = run_invasion(V0=V0, W0=W0, Y0=Y0,
+                        W_birth=W_birth, Y_birth=Y_birth,
+                        W_death=W_death, Y_death=Y_death,
+                        X_in=X_in, X_out=X_out,
+                        U_in=U_in_vals[i],U_out=U_out_vals[j],
+                        Z_in=Z_in, Z_out=Z_out,
+                        extinction_rate=extinction_rate, dt=dt,
+                        use_X=use_X, use_Z=use_Z,
+                        cycles=cycles, severity=severity,
+                        perturb_W=False, perturb_Y=True,
+                        plot=False, break_threshold=break_threshold
+                    )
+                    # save findings to deltas
+                    if deltaW> 0: # W can invade V  
+                        invasions = invasions + v
+                        deltas[((i,j), (i+di,j+dj))] = 1
+                        deltas[((i+di,j+dj), (i,j))] = -1
+                    else:
+                        deltas[((i,j), (i+di,j+dj))] = -1
+                        deltas[((i+di,j+dj), (i,j))] = 1
+
+                # store the mean sign ∈ [–1,+1]
+            score[i, j] = invasions
+
+    return score.T
 
 
 
+def local_invasibility_heatmap(V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=5,
+    U_in_min=0.01, U_in_max=0.4,
+    U_out_min=0.01, U_out_max=0.4,
+    folder='local_invasibility',
+    break_threshold=0.01
+):
+    """
+    For each interior gridpoint (i,j) on the plane U_in, U_out:
+      • Evaluate run_invasion at its 4 nearest neighbors
+      • Compute mean of their np.sign(deltaW)
+      • Plot 
+    """
+
+    # 1) Prepare output directory
+    os.makedirs(folder, exist_ok=True)
+
+    # 2) Build the 2d grid
+    U_in_vals = np.linspace(U_in_min, U_in_max, grid_size)
+    U_out_vals = np.linspace(U_out_min, U_out_max, grid_size)
+
+    # 3) Initialize the score matrix
+    score = np.zeros((grid_size, grid_size))
+
+    # 4) Offsets for the neighbors
+    neighbor_offsets = [         (-1,0),       
+                        ( 0,-1),         ( 0,1),
+                                 ( 1,0),       ]
+    
+    # deltas is the dictionary, which stores all the considered combination of invasion parameters and weather they succeed
+    deltas = {}
+    argsdict = {}
+
+    # 5) Loop over interior points (border does not have all the neighbours)
+    for i in tqdm(range(1, grid_size-1), desc="Computing local invasibility"):
+        for j in range(1, grid_size-1):
+            # invasions counts, how many neighbours can invade
+            invasions = 0
+            # loop over the neighbours
+            for di, dj in neighbor_offsets:
+                X_in = U_in_vals[i+di]
+                X_out = U_out_vals[j+dj]
+                # check weather the invasion has already been computed (antisymmetric if W invades V, V is invaded by W)
+                
+                if ((i+di,j+dj), (i,j)) in deltas.keys():
+                    if deltas[((i+di,j+dj), (i,j))] == -1:
+                        invasions += 1
+                else:
+                
+                    args = {
+                    "V0": V0, "W0": W0, "Y0": Y0,
+                    "W_birth": W_birth, "Y_birth": Y_birth,
+                    "W_death": W_death, "Y_death": Y_death,
+                    "X_in": X_in, "X_out": X_out,
+                    "U_in": U_in_vals[i], "U_out": U_out_vals[j],
+                    "Z_in": Z_in, "Z_out": Z_out,
+                    "extinction_rate": extinction_rate, "dt": dt,
+                    "use_X": use_X, "use_Z": use_Z,
+                    "cycles": cycles, "severity": severity,
+                    "perturb_W": False, "perturb_Y": True,
+                    "plot": False, "break_threshold": break_threshold
+                    }
+                    argsdict[((i,j), (i+di,j+dj))] = args
+                
+                    deltaW = run_invasion(**args
+                    )
+                    # save findings to deltas
+                    if deltaW> 0: # W can invade V  
+                        invasions += 1
+                        deltas[((i,j), (i+di,j+dj))] = 1
+                        deltas[((i+di,j+dj), (i,j))] = -1
+                    else:
+                        deltas[((i,j), (i+di,j+dj))] = -1
+                        deltas[((i+di,j+dj), (i,j))] = 1
+
+                # store the mean sign ∈ [–1,+1]
+            score[i, j] = invasions
+
+    # 6) Plot the result 
+    # mask out the border
+    mask = np.zeros_like(score, dtype=bool)
+    mask[ 0, :] = True   # top row
+    mask[-1, :] = True   # bottom row
+    mask[:,  0] = True   # left column
+    mask[:, -1] = True   # right column
+    score_masked = np.ma.array(score, mask=mask)
+
+    cmap = plt.get_cmap('Greens', 5)
+    cmap.set_bad(color='white') 
+
+    # 2. Create a norm that bins values 0–4 into 5 discrete intervals.
+    bounds = np.arange(-0.5, 5.5, 1)     
+    norm   = BoundaryNorm(bounds, cmap.N)
+    # 6) Plot the result 
+    plt.figure(figsize=(9,8))
+    im = plt.imshow(
+        score_masked.T,
+        origin='lower',
+        extent=[U_in_min, U_in_max, U_out_min, U_out_max],
+        aspect='auto',
+        cmap=cmap,
+        norm=norm,
+        zorder=0
+    )
+
+    plt.xlabel('U_in')
+    plt.ylabel('U_out')
+    plt.title('Local invasibility (Number of invading neighbors)')
+
+    # add gridlines that align with the coloured squares
+    # compute the edges of the cells:
+    x_edges = np.linspace(U_in_min, U_in_max, grid_size + 1)
+    y_edges = np.linspace(U_out_min, U_out_max, grid_size + 1)
+    # draw vertical grid lines
+    for x in x_edges:
+        plt.axvline(x, color='black', linewidth=1, linestyle='-',
+                    zorder=1)
+    # draw horizontal grid lines
+    for y in y_edges:
+        plt.axhline(y, color='black', linewidth=1, linestyle='-',
+                    zorder=1)
+
+    # now add the colorbar
+    cbar = plt.colorbar(im, ticks=np.arange(0, 5, 1), boundaries=bounds)
+    cbar.set_label('Count of invading neighbors')
+
+    plt.tight_layout()
+
+    # save a new file without overwriting
+    existing = sorted([p for p in os.listdir(folder) 
+                       if p.startswith('local_inv') and p.endswith('.pdf')])
+    idx = int(re.search(r'\d+', existing[-1]).group())+1 if existing else 0
+    fname = os.path.join(folder, f'local_inv{idx}.pdf')
+    plt.savefig(fname)
+    plt.show()
+    return U_in_vals, U_out_vals, score, deltas, argsdict
 
 
 
