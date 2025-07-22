@@ -26,7 +26,7 @@ global_invasibility captures which parameters lead to invasion given a fixed (te
 '''
 
 
-def compute_equilibrium(W_birth, W_death, Y_birth, Y_death, X_death, X_in, X_out):
+def compute_equilibrium(W_birth, W_death, Y_birth, Y_death):
     """
     Compute the positive nontrivial equilibrium (W_eq, Y_eq) by solving:
       Q1 = W_death / W_birth,   Q2 = Y_death / Y_birth
@@ -34,13 +34,14 @@ def compute_equilibrium(W_birth, W_death, Y_birth, Y_death, X_death, X_in, X_out
       Y_eq = ½ [ (1 - Q2 + Q1) + sqrt((1 - Q2 + Q1)^2 - 4·Q1 ) ]
     Returns (W_eq, Y_eq) if both lie in (0,1); otherwise (None, None).
     """
-    W_death = W_death + (X_in)
+
 
     Q1 = W_death / W_birth
     Q2 = Y_death / Y_birth
 
     disc_W = (1 - Q1 + Q2)**2 - 4 * Q2
     if disc_W < 0:
+        print('no Equil')
         return None, None
     sqrt_disc_W = np.sqrt(disc_W)
     W_equil = 0.5 * ((1 - Q1 + Q2) + sqrt_disc_W)
@@ -49,6 +50,7 @@ def compute_equilibrium(W_birth, W_death, Y_birth, Y_death, X_death, X_in, X_out
 
     disc_Y = (1 - Q2 + Q1)**2 - 4 * Q1
     if disc_Y < 0:
+        print('no Equil')
         return None, None
     sqrt_disc_Y = np.sqrt(disc_Y)
     Y_equil = 0.5 * ((1 - Q2 + Q1) + sqrt_disc_Y)
@@ -63,6 +65,7 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
                       X_in, X_out,
                       U_in, U_out, 
                       Z_in, Z_out, 
+                      X_death,
                       duration, dt,
                       use_X=True, use_Z=False,
                       tol=1e-7,
@@ -123,21 +126,12 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
             dY += Z_out * Zi - Z_in * Yi
 
         # seed bank dynamics 
-        dX = - X_out * Xi + X_in * Wi
-        dU = - U_out * Ui + U_in * Vi
+        dX = - (X_out + X_death) * Xi + X_in * Wi
+        dU = - (U_out + X_death) * Ui + U_in * Vi
         dZ = - Z_out * Zi + Z_in * Yi
 
 
         # If stop_at_eq=True, check for equilibrium
-        if stop_at_eq:
-            cond = (abs(dV) < tol and abs(dW) < tol and abs(dY) < tol)
-            if use_X:
-                cond &= abs(dX) < tol
-            if use_Z:
-                cond &= abs(dZ) < tol
-            if cond:
-                final_index = i - 1
-                break
 
         # Euler update
         V[i] = Vi + dt * dV
@@ -170,14 +164,13 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
 
     # Compute scalers for plotting (so the seedbank and active populations are on the same scale)
         
-    X_scaler = X_out / X_in 
+    X_scaler = (X_out + X_death) / X_in 
     Z_scaler = Z_out / Z_in 
-    U_scaler = U_out / U_in
+    U_scaler = (U_out + X_death) / U_in
 
     X_plot = X * X_scaler
     Z_plot = Z * Z_scaler
     U_plot = U * U_scaler
-
 
 
     return t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot
@@ -188,6 +181,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
               X_in, X_out,
               U_in, U_out,
               Z_in, Z_out,
+              X_death,
               Time=200.0, dt=0.1,
               use_X=True, use_Z=False,
               severity=0.5,
@@ -213,6 +207,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
         X_in=X_in, Z_in=Z_in,
         X_out=X_out, Z_out=Z_out,
         U_in=U_in, U_out=U_out,
+        X_death=X_death,
         duration=perturb_time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -242,6 +237,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
         X_in=X_in, Z_in=Z_in,
         X_out=X_out, Z_out=Z_out,
         U_in=U_in, U_out=U_out,
+        X_death=X_death,
         duration=Time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -292,6 +288,7 @@ def run_invasion(V0, W0, Y0,
                X_in, X_out,
                U_in, U_out,
                Z_in, Z_out,
+               X_death,
                extinction_rate, dt,
                use_X, use_Z,
                severity,
@@ -315,9 +312,9 @@ def run_invasion(V0, W0, Y0,
 
     #get equilibrium seedbank sizes
 
-    X0 = W0 / (X_out / X_in)
-    U0 = V0 / (U_out / U_in)
-    Z0 = Y0 / (Z_out /Z_in)
+    X0 = W0 / ((X_out + X_death) / X_in)
+    U0 = V0 / ((X_out + X_death) / U_in)
+    Z0 = Y0 / (Z_out / Z_in)
 
     U_current = U0
     V_current = V0
@@ -329,13 +326,15 @@ def run_invasion(V0, W0, Y0,
     V_finals = []
     W_finals = []
     Y_finals = []
+    U_finals = []
+    X_finals = []
 
     for n in range(1, cycles+1):
 
         # 1) simulate one segment
         t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment(
             V0=V_current, W0=W_current, Y0=Y_current, X0=X_current, Z0=Z_current, U0=U_current,
-            W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,
+            W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,X_death=X_death,
             X_in=X_in, Z_in=Z_in, X_out=X_out, Z_out=Z_out, U_in=U_in, U_out=U_out,
             duration=extinction_rate, dt=dt,
             use_X=use_X, use_Z=use_Z,
@@ -347,10 +346,14 @@ def run_invasion(V0, W0, Y0,
         V_final = V[-1]
         W_final = W[-1]
         Y_final = Y[-1]
+        U_final = U_plot[-1]
+        X_final = X_plot[-1]
 
         V_finals.append(V_final)
         W_finals.append(W_final)
         Y_finals.append(Y_final)
+        U_finals.append(U_final)
+        X_finals.append(X_final)
 
         # burn in, if the extinction rate is faster then the return to equilibrium, the population values drop uniformly
         if n == 50:
@@ -385,7 +388,9 @@ def run_invasion(V0, W0, Y0,
         cycles_idx = np.arange(1, n+1)
         plt.figure(figsize=(8, 5))
         plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
+        #plt.plot(cycles_idx, U_finals, label='U', color='gold')
         plt.plot(cycles_idx, V_finals, label='V', color='orange')
+        #plt.plot(cycles_idx, X_finals, label='X', color='lime')
         if show_Y:
             plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
@@ -427,7 +432,7 @@ def run_invasion(V0, W0, Y0,
 
 def global_invasability(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_out, X_death,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
@@ -463,6 +468,7 @@ def global_invasability(V0, W0, Y0,
                         X_in=X_in, X_out=X_out,
                         U_in=U_in,U_out=U_out,
                         Z_in=Z_in, Z_out=Z_out,
+                        X_death=X_death,
                         extinction_rate=extinction_rate, dt=dt,
                         use_X=use_X, use_Z=use_Z,
                         cycles=cycles, severity=severity,
@@ -535,7 +541,7 @@ def global_invasability(V0, W0, Y0,
 
 def local_invasibility(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_out, X_death,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
@@ -593,7 +599,7 @@ def local_invasibility(V0, W0, Y0,
                     "W_death": W_death, "Y_death": Y_death,
                     "X_in": X_in, "X_out": X_out,
                     "U_in": U_in_vals[i], "U_out": U_out_vals[j],
-                    "Z_in": Z_in, "Z_out": Z_out,
+                    "Z_in": Z_in, "Z_out": Z_out, "X_death":X_death,
                     "extinction_rate": extinction_rate, "dt": dt,
                     "use_X": use_X, "use_Z": use_Z,
                     "cycles": cycles, "severity": severity,
@@ -675,11 +681,10 @@ def local_invasibility(V0, W0, Y0,
     plt.show()
     return U_in_vals, U_out_vals, score, deltas, argsdict
 
-def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,
-                  
+def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,            
     V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_out, X_death,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
@@ -705,6 +710,7 @@ def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,
             X_in, X_out,
             U_in, U_out,
             Z_in, Z_out,
+            X_death,
             extinction_rate, dt,
             use_X, use_Z,
             severity,

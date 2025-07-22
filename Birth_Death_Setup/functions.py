@@ -286,6 +286,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     plt.tight_layout()
     plt.savefig('/Users/xaverwangerpohl/Documents/GitHub/master-code/SegmentPlots/segment.pdf', format='pdf')
     plt.show()
+    print(delta_W_test)
     
 
     return 
