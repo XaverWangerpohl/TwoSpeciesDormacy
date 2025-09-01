@@ -199,20 +199,21 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     Returns results dict.
     """
 
+    args = {'V0':V0, 'W0':W0, 'Y0':Y0, 'X0':X0, 'Z0':Z0, 'U0':U0,
+        'W_birth':W_birth, 'Y_birth':Y_birth,
+        'W_death':W_death, 'Y_death':Y_death,
+        'X_in':X_in, 'Z_in':Z_in,
+        'X_out':X_out, 'Z_out':Z_out,
+        'U_in':U_in, 'U_out':U_out,
+        'X_death':X_death,
+        'duration':perturb_time, 'dt':dt,
+        'use_X':use_X, 'use_Z':use_Z,
+        'tol':tol,
+        'stop_at_eq':False}
+    
+
     # Stage A, part to ensure, that we start at equilibrium
-    t_pre, U_pre, V_pre, W_pre, X_pre, Y_pre, Z_pre, X_pre_plot, Z_pre_plot, U_pre_plot = simulate_segment(
-        V0=V0, W0=W0, Y0=Y0, X0=X0, Z0=Z0, U0=U0,
-        W_birth=W_birth, Y_birth=Y_birth,
-        W_death=W_death, Y_death=Y_death,
-        X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
-        X_death=X_death,
-        duration=perturb_time, dt=dt,
-        use_X=use_X, use_Z=use_Z,
-        tol=tol,
-        stop_at_eq=False
-    )
+    t_pre, U_pre, V_pre, W_pre, X_pre, Y_pre, Z_pre, X_pre_plot, Z_pre_plot, U_pre_plot = simulate_segment(**args)
 
     # make the time coherent
     t_pre_shifted = t_pre - perturb_time
@@ -279,8 +280,9 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+    plt.savefig('/Users/xaverwangerpohl/Documents/GitHub/master-code/SegmentPlots/segment_death.pdf')
 
-    return 
+    return args
 
 def run_invasion(V0, W0, Y0,
                W_birth, Y_birth,
@@ -313,7 +315,7 @@ def run_invasion(V0, W0, Y0,
     #get equilibrium seedbank sizes
 
     X0 = W0 / ((X_out + X_death) / X_in)
-    U0 = V0 / ((X_out + X_death) / U_in)
+    U0 = V0 / ((U_out + X_death) / U_in)
     Z0 = Y0 / (Z_out / Z_in)
 
     U_current = U0
@@ -331,16 +333,21 @@ def run_invasion(V0, W0, Y0,
 
     for n in range(1, cycles+1):
 
+        args = {'V0':V_current, 'W0':W_current, 'Y0':Y_current, 'X0':X_current, 'Z0':Z_current, 'U0':U_current,
+            'W_birth':W_birth, 'Y_birth':Y_birth,
+            'W_death':W_death, 'Y_death':Y_death,
+            'X_in':X_in, 'Z_in':Z_in,
+            'X_out':X_out, 'Z_out':Z_out,
+            'U_in':U_in, 'U_out':U_out,
+            'X_death':X_death,
+            'duration':extinction_rate, 'dt':dt,
+            'use_X':use_X, 'use_Z':use_Z,
+            'stop_at_eq':False}
+       
+
         # 1) simulate one segment
-        t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment(
-            V0=V_current, W0=W_current, Y0=Y_current, X0=X_current, Z0=Z_current, U0=U_current,
-            W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,X_death=X_death,
-            X_in=X_in, Z_in=Z_in, X_out=X_out, Z_out=Z_out, U_in=U_in, U_out=U_out,
-            duration=extinction_rate, dt=dt,
-            use_X=use_X, use_Z=use_Z,
-            tol=1e-7,
-            stop_at_eq=True
-        )
+        t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment(**args)
+
 
         # 2) record final values of the segment
         V_final = V[-1]
@@ -382,15 +389,15 @@ def run_invasion(V0, W0, Y0,
         Z_current = Z[-1]
         U_current = U[-1]
 
-
+    
     if plot:
         # plot all three on one figure
         cycles_idx = np.arange(1, n+1)
         plt.figure(figsize=(8, 5))
         plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
-        #plt.plot(cycles_idx, U_finals, label='U', color='gold')
+        plt.plot(cycles_idx, U_finals, label='U', color='gold')
         plt.plot(cycles_idx, V_finals, label='V', color='orange')
-        #plt.plot(cycles_idx, X_finals, label='X', color='lime')
+        plt.plot(cycles_idx, X_finals, label='X', color='lime')
         if show_Y:
             plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
@@ -429,6 +436,161 @@ def run_invasion(V0, W0, Y0,
         plt.show()
 
     return W_final - W0
+
+
+def run_invasion_long(V0, W0, Y0,
+               W_birth, Y_birth,
+               W_death, Y_death,
+               X_in, X_out,
+               U_in, U_out,
+               Z_in, Z_out,
+               X_death,
+               extinction_rate, dt,
+               use_X, use_Z,
+               severity,
+               cycles=10000,
+               perturb_W=False,
+               perturb_Y=True,
+               plot=False,
+               stop=None,
+               break_threshold=0.01, show_Y=False):
+    """
+    Run 'cycles' successive calls to simulate_segment, each time:
+      1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
+      2) record final V, W, Y
+      3) if perturb_W: set W0_next = (1-severity)*W_final and
+                         V0_next = (1-severity)*V_final
+      4) if perturb_Y: set Y0_next = (1-severity)*Y_final
+      5) X0_next = X_final, Z0_next = Z_final
+    After all cycles, plot cycle index vs final W, V, and Y.
+    Returns lists of final values [V_finals, W_finals, Y_finals].
+    """
+
+    #get equilibrium seedbank sizes
+
+    X0 = W0 / ((X_out + X_death) / X_in)
+    U0 = V0 / ((U_out + X_death) / U_in)
+    Z0 = Y0 / (Z_out / Z_in)
+
+    U_current = U0
+    V_current = V0
+    W_current = W0
+    X_current = X0
+    Y_current = Y0
+    Z_current = Z0
+    
+    V_finals = []
+    W_finals = []
+    Y_finals = []
+    U_finals = []
+    X_finals = []
+
+    for n in range(1, cycles+1):
+
+        args = {'V0':V_current, 'W0':W_current, 'Y0':Y_current, 'X0':X_current, 'Z0':Z_current, 'U0':U_current,
+            'W_birth':W_birth, 'Y_birth':Y_birth,
+            'W_death':W_death, 'Y_death':Y_death,
+            'X_in':X_in, 'Z_in':Z_in,
+            'X_out':X_out, 'Z_out':Z_out,
+            'U_in':U_in, 'U_out':U_out,
+            'X_death':X_death,
+            'duration':extinction_rate, 'dt':dt,
+            'use_X':use_X, 'use_Z':use_Z,
+            'stop_at_eq':False}
+       
+
+        # 1) simulate one segment
+        t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment(**args)
+
+
+        # 2) record final values of the segment
+        V_final = V[-1]
+        W_final = W[-1]
+        Y_final = Y[-1]
+        U_final = U_plot[-1]
+        X_final = X_plot[-1]
+
+        V_finals = V_finals + list(V)
+        W_finals = W_finals + list(W)
+        Y_finals = Y_finals + list(Y)
+        U_finals = U_finals + list(U_plot)
+        X_finals = X_finals + list(X_plot)
+
+        # burn in, if the extinction rate is faster then the return to equilibrium, the population values drop uniformly
+        if n == 50:
+            W0 = W_final
+
+        # break threshold to accelerate the computation (if we grow by some amount, we expect it to grow fully)
+        
+        if (abs(W_final - W0) > break_threshold) and n > 50:
+            break
+
+        # 3) perturb for next cycle (extinction event)
+        if perturb_W:
+            V_current = (1 - severity) * V_final
+            W_current = (1 - severity) * W_final
+        else:
+            V_current = V_final
+            W_current = W_final
+
+        if perturb_Y:
+            Y_current = (1 - severity) * Y_final
+        else:
+            Y_current = Y_final
+
+        # 4) carry over X, Z unchanged
+        X_current = X[-1]
+        Z_current = Z[-1]
+        U_current = U[-1]
+
+    
+    if plot:
+        # plot all three on one figure
+        cycles_idx = np.arange(1, len(W_finals)+1)
+        plt.figure(figsize=(8, 5))
+        plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
+        plt.plot(cycles_idx, U_finals, label='U', color='gold')
+        plt.plot(cycles_idx, V_finals, label='V', color='orange')
+        plt.plot(cycles_idx, X_finals, label='X', color='lime')
+        if show_Y:
+            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
+        plt.xlabel('Cycle', fontsize=12)
+        plt.ylabel('Density', fontsize=12)
+        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr += ', W Perturbed, ' if perturb_W else ''
+        titlestr += ', Y perturbed, ' if perturb_Y else ''
+        titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
+            U_in, U_out, X_in, X_out)
+        plt.title(titlestr, fontsize=14)
+
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+
+        # Saving the plot
+        
+        folder = "run_invasion"
+        os.makedirs(folder, exist_ok=True)
+        base = "run_invasion"
+        pattern = os.path.join(folder, base + "*.pdf")
+        existing = glob.glob(pattern)
+        if not existing:
+            pdf_name = base + ".pdf"
+        else:
+            taken = set(int(os.path.basename(p).replace(base,"").replace(".pdf","") or 0)
+                        for p in existing if os.path.basename(p).replace(base,"").replace(".pdf","").isdigit() or p.endswith(base+".pdf"))
+            k=0
+            while k in taken:
+                k+=1
+            pdf_name=f"{base}{k}.pdf"
+        path = os.path.join(folder, pdf_name)
+        plt.savefig(path)
+        print(f"Saved run_invasion plot to {path}")
+
+        plt.show()
+
+    return W_final - W0
+
 
 def global_invasability(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,

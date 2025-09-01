@@ -1936,13 +1936,12 @@ def local_invasibility2(V0, W0, Y0,
 
     return score.T
 
-
-
 def local_invasibility_heatmap(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
     Z_in, Z_out,
     extinction_rate, dt,
     use_X, use_Z,
+    perturb_W, perturb_Y,
     cycles, severity,
     grid_size=5,
     U_in_min=0.01, U_in_max=0.4,
@@ -2002,7 +2001,7 @@ def local_invasibility_heatmap(V0, W0, Y0,
                     "extinction_rate": extinction_rate, "dt": dt,
                     "use_X": use_X, "use_Z": use_Z,
                     "cycles": cycles, "severity": severity,
-                    "perturb_W": False, "perturb_Y": True,
+                    "perturb_W": perturb_W, "perturb_Y": perturb_Y,
                     "plot": False, "break_threshold": break_threshold
                     }
                     argsdict[((i,j), (i+di,j+dj))] = args

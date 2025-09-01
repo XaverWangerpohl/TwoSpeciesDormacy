@@ -14,6 +14,7 @@ from functions_death import (compute_equilibrium,
                        run_invasion,
                        global_invasability,
                        local_invasibility,
+                       run_invasion_long
                        )
 
 W_birth = 0.7
@@ -40,8 +41,8 @@ use_Z = False
 num_points = 100
 severity = 0.8
 cycles = 2000
-extinction_rate = 200
-U_in, U_out = (10, 1)
+extinction_rate = 20.0
+U_in, U_out = (1, 1)
 X_in, X_out = (1,0.001)
 
 # calculate starting values
@@ -67,18 +68,39 @@ Z0 = Y0 / (Z_out /Z_in)
 
 dt = 0.1
 
+def dict_differences(dict1, dict2):
+    keys1 = set(dict1)
+    keys2 = set(dict2)
+
+    only_in_dict1 = keys1 - keys2
+    only_in_dict2 = keys2 - keys1
+    in_both_but_different = {
+        k: (dict1[k], dict2[k])
+        for k in keys1 & keys2
+        if dict1[k] != dict2[k]
+    }
+
+    return {
+        'only_in_dict1': {k: dict1[k] for k in only_in_dict1},
+        'only_in_dict2': {k: dict2[k] for k in only_in_dict2},
+        'in_both_but_different': in_both_but_different
+    }
+
+# Example usage:
+
+
 
 if __name__ == '__main__':
     print(W_death_eq,V_death_eq)
 
     # test of run_segment function
-
-    #plot_segment(U0=U0, V0=V0, W0=W0, X0=X0, Y0=Y0, Z0=Z0, W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,X_in=X_in, X_out=X_out, U_in=U_in, U_out=U_out, Z_in=Z_in, Z_out=Z_out, X_death=X_death,Time=200.0, dt=0.1,use_X=True, use_Z=False,severity=0.5,perturb_W=False, perturb_Y=True,perturb_time=200.0,tol=1e-7)
+    plot_segment(U0=U0, V0=V0, W0=W0, X0=X0, Y0=Y0, Z0=Z0, W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,X_in=X_in, X_out=X_out, U_in=U_in, U_out=U_out, Z_in=Z_in, Z_out=Z_out, X_death=X_death,Time=4000.0, dt=0.1,use_X=True, use_Z=False,severity=0.5,perturb_W=False, perturb_Y=True,perturb_time=200.0,tol=1e-7)
 
     # test of run invasion function
 
 
-    run_invasion(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, X_in, X_out,U_in, U_out, Z_in, Z_out,X_death, extinction_rate, dt,use_X, use_Z,severity,cycles=1000,perturb_W=False,perturb_Y=True ,plot=True,stop=None,break_threshold=1)
+    #b = run_invasion_long(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, X_in, X_out,U_in, U_out, Z_in, Z_out,X_death, extinction_rate, dt,use_X, use_Z,severity,cycles=20,perturb_W=False,perturb_Y=True ,plot=True,stop=None,break_threshold=1)
+
 
     # test of global fitness (adnust grid size for bigger picture)
 

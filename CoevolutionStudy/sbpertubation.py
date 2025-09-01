@@ -8,28 +8,6 @@ import matplotlib.pyplot as plt
 from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 import seaborn as sns
-import matplotlib as mpl
-
-
-
-
-# LaTeX: Times-like math (newtxmath) + Computer Modern text
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['font.serif'] = ['CMU Serif', 'Computer Modern Roman', 'DejaVu Serif', 'Times New Roman', 'Times']
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['text.latex.preamble'] = r'\usepackage{newtxmath}'
-# Legend appearance: slightly opaque background
-mpl.rcParams['legend.framealpha'] = .9
-# PGF export configuration (pdflatex + newtxmath)
-mpl.rcParams['pgf.texsystem'] = 'pdflatex'
-mpl.rcParams['pgf.preamble'] = r'\usepackage{newtxmath}'
-plt.rcParams['axes.titlesize'] = 14
-width_pt = 390
-inches_per_pt = 1.0/72.27
-golden_ratio = (5**.5 - 1) / 2  # aesthetic figure height
-
-fig_width = width_pt * inches_per_pt  # width in inches
-fig_height = fig_width * golden_ratio # height in inches
 
 # Allow imports from parent directory
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -42,6 +20,7 @@ W_birth, W_death = 0.4, 0.1
 Y_birth, Y_death = 0.9, 0.15
 U_in, U_out      = 0.000001, 1
 X_in, X_out      = 0.1, 0.005
+SB_death = 0.00005
 # Compute equilibrium slice
 Wss, Yss = compute_nontrivial_slice(W_birth, W_death, Y_birth, Y_death)
 W0 = Wss / 2
@@ -51,10 +30,6 @@ U0 = V0 / (U_out / U_in)
 Y0 = Yss
 size = 1000  # scaling to integer counts
 
-
-
-
-
 # ── Antimony model ──
 ANT_MODEL = f"""
 model birth_death()
@@ -63,12 +38,14 @@ model birth_death()
   W = {int(W0*size)}
   X = {int(X0*size)}
   Y = {int(Y0*size)}
+  k = 0
 
   size     = {size}
   W_birth  = {W_birth};   W_death  = {W_death}
   Y_birth  = {Y_birth};   Y_death  = {Y_death}
   U_in     = {U_in};   U_out    = {U_out}
   X_in     = {X_in};   X_out    = {X_out}
+  SB_death = {SB_death}
 
   W_symbiosis:    => W; W_birth/size * W * Y
   V_symbiosis:    => V; W_birth/size * V * Y
@@ -77,6 +54,9 @@ model birth_death()
   V_death_reaction: V => ; W_death * V
   W_death_reaction: W => ; W_death * W
   Y_death_reaction: Y => ; Y_death * Y
+  U_death_reaction: U => ; SB_death * U
+  X_death_reaction: X => ; SB_death * X
+
 
   U_quiescence_in:   V => U; U_in  * V
   X_quiescence_in:   W => X; X_in  * W 
@@ -86,11 +66,12 @@ model birth_death()
   V_compete: V => ; W_birth/(size^2) * V * (W + V) * Y
   W_compete: W => ; W_birth/(size^2) * W * (V + W) * Y
   Y_compete: Y => ; Y_birth/(size^2) * Y * (V + W) * Y
+
+  E_periodic: at(Y >= {int(Y0*size)}):
+             Y = Y * 0.4, k = k + 1;
+
 end
 """
-
-
-
 
 
 
@@ -122,7 +103,7 @@ def plot_VWY_trajectories(npz_file: str = 'results_all.npz',
     n_reps = all_data.shape[0]
 
     os.makedirs(output_dir, exist_ok=True)
-    plt.figure(figsize=(fig_width,fig_height))
+    plt.figure(figsize=(10,6))
     colors = {'V':'orange','W':'darkgreen','Y':'darkblue'}
     pct = {}
     # plot individual
@@ -130,7 +111,6 @@ def plot_VWY_trajectories(npz_file: str = 'results_all.npz',
         for rep in range(n_reps):
             plt.plot(times, all_data[rep,:,i], color=colors[sp], alpha=0.02, lw=0.5)
     # plot mean & compute extinction
-    labels = (r'$\widehat{W}^a$', r'$W^a$', r'$Y$')
     for sp,i in zip(('V','W','Y'), idxs):
         mean_traj = all_data[:,:,i].mean(axis=0)
         plt.plot(times, mean_traj, color=colors[sp], lw=2, label=f'{sp} mean')
@@ -138,17 +118,17 @@ def plot_VWY_trajectories(npz_file: str = 'results_all.npz',
         pct[sp] = extinct/n_reps*100
 
     title = ', '.join(f"{sp}: {pct[sp]:.1f}%" for sp in pct)
-    plt.title("V, W (seedbank), Y trajectories ({title} extinct)")
+    plt.title(f"V, W (seedbank), Y trajectories ({title} extinct)")
     plt.xlabel('Time'); plt.ylabel('Count')
     plt.legend(); plt.tight_layout()
-    out = os.path.join(output_dir,'VWY_trajectories.png')
+    out = os.path.join(output_dir,'VWY_trajectories_sbperiodic.png')
     plt.savefig(out, dpi=300); plt.close()
     print(f"Saved VWY plot to {out}")
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--n-reps',   type=int,   default=100)
-    p.add_argument('--t-end',    type=float, default=1000.0)
+    p.add_argument('--t-end',    type=float, default=20000.0)
     p.add_argument('--n-points', type=int,   default=500)
     p.add_argument('--cpus',     type=int,   default=os.cpu_count())
     p.add_argument('--out',      type=str,   default='results_all.npz')

@@ -58,12 +58,12 @@ def compute_equilibrium(W_birth, W_death, Y_birth, Y_death):
 def simulate_segment(U0, V0, W0, X0, Y0, Z0,
                       W_birth, Y_birth,
                       W_death, Y_death,
-                      X_in, X_out,
-                      U_in, U_out, 
-                      Z_in, Z_out, 
+                      X_in, X_size,
+                      U_in, U_size, 
+                      Z_in, Z_size, 
                       duration, dt,
                       use_X=True, use_Z=False,
-                      tol=1e-7,
+                      tol=1e-8,
                       stop_at_eq=True):
     """
     Integrate from t=0 to t=duration with initial conditions
@@ -76,6 +76,11 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
       X_array (unscaled), Z_array (unscaled),
       X_plot = X_array * X_scaler, Z_plot = Z_array * Z_scaler.
     """
+
+    X_out =  X_in / X_size
+    U_out =  U_in / U_size 
+    Z_out =  Z_in / Z_size 
+
 
 
     N = int(np.ceil(duration / dt)) + 1
@@ -183,9 +188,9 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
 def plot_segment(U0, V0, W0, X0, Y0, Z0,
               W_birth, Y_birth,
               W_death, Y_death,
-              X_in, X_out,
-              U_in, U_out,
-              Z_in, Z_out,
+              X_in, X_size,
+              U_in, U_size,
+              Z_in, Z_size,
               Time=200.0, dt=0.1,
               use_X=True, use_Z=False,
               severity=0.5,
@@ -209,8 +214,8 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
         W_birth=W_birth, Y_birth=Y_birth,
         W_death=W_death, Y_death=Y_death,
         X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
+        X_size=X_size, Z_size=Z_size,
+        U_in=U_in, U_size=U_size,
         duration=perturb_time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -238,8 +243,8 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
         W_birth=W_birth, Y_birth=Y_birth,
         W_death=W_death, Y_death=Y_death,
         X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
+        X_size=X_size, Z_size=Z_size,
+        U_in=U_in, U_size=U_size,
         duration=Time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -258,8 +263,8 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
 
     delta_W_test = W_final - W_eq_pre
 
-    X_scaler = X_out/X_in
-    U_scaler = U_out/U_in
+    X_scaler = X_size
+    U_scaler = U_size
 
 
     # Time-series plot
@@ -294,9 +299,9 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
 def run_invasion(V0, W0, Y0,
                W_birth, Y_birth,
                W_death, Y_death,
-               X_in, X_out,
-               U_in, U_out,
-               Z_in, Z_out,
+               X_in, X_size,
+               U_in, U_size,
+               Z_in, Z_size,
                extinction_rate, dt,
                use_X, use_Z,
                severity,
@@ -305,7 +310,7 @@ def run_invasion(V0, W0, Y0,
                perturb_Y=True,
                plot=False,
                stop=None,
-               break_threshold=0.01, show_Y=False):
+               break_threshold=0.001, show_Y=False):
     """
     Run 'cycles' successive calls to simulate_segment, each time:
       1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
@@ -320,9 +325,9 @@ def run_invasion(V0, W0, Y0,
 
     #get equilibrium seedbank sizes
 
-    X0 = W0 / (X_out / X_in)
-    U0 = V0 / (U_out / U_in)
-    Z0 = Y0 / (Z_out /Z_in)
+    X0 = W0 * X_size
+    U0 = V0 * U_size
+    Z0 = Y0 * Z_size
 
     U_current = U0
     V_current = V0
@@ -341,10 +346,10 @@ def run_invasion(V0, W0, Y0,
         t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment(
             V0=V_current, W0=W_current, Y0=Y_current, X0=X_current, Z0=Z_current, U0=U_current,
             W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,
-            X_in=X_in, Z_in=Z_in, X_out=X_out, Z_out=Z_out, U_in=U_in, U_out=U_out,
+            X_in=X_in, Z_in=Z_in, X_size=X_size, Z_size=Z_size, U_in=U_in, U_size=U_size,
             duration=extinction_rate, dt=dt,
             use_X=use_X, use_Z=use_Z,
-            tol=1e-7,
+            tol=1e-8,
             stop_at_eq=True
         )
 
@@ -399,7 +404,7 @@ def run_invasion(V0, W0, Y0,
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
-            U_in, U_out, X_in, X_out)
+            U_in, U_size, X_in, X_size)
         plt.title(titlestr, fontsize=14)
 
         plt.legend()
@@ -432,29 +437,29 @@ def run_invasion(V0, W0, Y0,
 
 def global_invasability(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_size,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
     grid_size,
-    U_in=0.1, U_out=0.1,
+    U_in=0.1, U_size=0.1,
     X_in_range = 0.1,
-    X_out_range = 0.1,
+    X_size_range = 0.1,
     perturb_W=False, perturb_Y=True, break_threshold=0.01
 
 ):
     """
-    Generate an invasion plot over X_in (x-axis) and X_out (y-axis).
+    Generate an invasion plot over X_in (x-axis) and X_size (y-axis).
     Uses the middle point of the grid as the resident
 
     """
 
     X_in_vals = np.linspace(U_in-X_in_range, U_in + X_in_range, grid_size)
-    X_out_vals = np.linspace(U_out-X_out_range, U_out + X_out_range, grid_size)
+    X_size_vals = np.linspace(U_size-X_size_range, U_size + X_size_range, grid_size)
     deltaW_matrix = np.zeros((grid_size, grid_size))
 
     for i, X_in in enumerate(tqdm(X_in_vals, desc="Scanning X_in")):
-        for j, X_out in enumerate(X_out_vals):
+        for j, X_size in enumerate(X_size_vals):
             # Mirror diagonal
             if (j == i) and (i == grid_size // 2):
                 deltaW_matrix[j, i] = 0.0
@@ -465,9 +470,9 @@ def global_invasability(V0, W0, Y0,
                         V0=V0, W0=W0, Y0=Y0,
                         W_birth=W_birth, Y_birth=Y_birth,
                         W_death=W_death, Y_death=Y_death,
-                        X_in=X_in, X_out=X_out,
-                        U_in=U_in,U_out=U_out,
-                        Z_in=Z_in, Z_out=Z_out,
+                        X_in=X_in, X_size=X_size,
+                        U_in=U_in,U_size=U_size,
+                        Z_in=Z_in, Z_size=Z_size,
                         extinction_rate=extinction_rate, dt=dt,
                         use_X=use_X, use_Z=use_Z,
                         cycles=cycles, severity=severity,
@@ -478,7 +483,7 @@ def global_invasability(V0, W0, Y0,
 
     # make grid edges
     X_edges = np.linspace(U_in - X_in_range, U_in + X_in_range, grid_size + 1)
-    Y_edges = np.linspace(U_out - X_out_range, U_out + X_out_range, grid_size + 1)
+    Y_edges = np.linspace(U_size - X_size_range, U_size + X_size_range, grid_size + 1)
 
 
         # Prepare output folder
@@ -536,22 +541,22 @@ def global_invasability(V0, W0, Y0,
     fig.savefig(os.path.join(folder, bin_fname), format='pdf')
     plt.show()
 
-    return X_in_vals, X_out_vals, deltaW_matrix
+    return X_in_vals, X_size_vals, deltaW_matrix
 
 def local_invasibility(V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_size,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
     grid_size=5,
     U_in_min=0.01, U_in_max=0.4,
-    U_out_min=0.01, U_out_max=0.4,
+    U_size_min=0.01, U_size_max=0.4,
     folder='local_invasibility',
     break_threshold=0.01
 ):
     """
-    For each interior gridpoint (i,j) on the plane U_in, U_out:
+    For each interior gridpoint (i,j) on the plane U_in, U_size:
       • Evaluate run_invasion at its 4 nearest neighbors
       • Compute mean of their np.sign(deltaW)
       • Plot 
@@ -562,7 +567,7 @@ def local_invasibility(V0, W0, Y0,
 
     # 2) Build the 2d grid
     U_in_vals = np.linspace(U_in_min, U_in_max, grid_size)
-    U_out_vals = np.linspace(U_out_min, U_out_max, grid_size)
+    U_size_vals = np.linspace(U_size_min, U_size_max, grid_size)
 
     # 3) Initialize the score matrix
     score = np.zeros((grid_size, grid_size))
@@ -584,7 +589,7 @@ def local_invasibility(V0, W0, Y0,
             # loop over the neighbours
             for di, dj in neighbor_offsets:
                 X_in = U_in_vals[i+di]
-                X_out = U_out_vals[j+dj]
+                X_size = U_size_vals[j+dj]
                 # check weather the invasion has already been computed (antisymmetric if W invades V, V is invaded by W)
                 
                 if ((i+di,j+dj), (i,j)) in deltas.keys():
@@ -596,9 +601,9 @@ def local_invasibility(V0, W0, Y0,
                     "V0": V0, "W0": W0, "Y0": Y0,
                     "W_birth": W_birth, "Y_birth": Y_birth,
                     "W_death": W_death, "Y_death": Y_death,
-                    "X_in": X_in, "X_out": X_out,
-                    "U_in": U_in_vals[i], "U_out": U_out_vals[j],
-                    "Z_in": Z_in, "Z_out": Z_out,
+                    "X_in": X_in, "X_size": X_size,
+                    "U_in": U_in_vals[i], "U_size": U_size_vals[j],
+                    "Z_in": Z_in, "Z_size": Z_size,
                     "extinction_rate": extinction_rate, "dt": dt,
                     "use_X": use_X, "use_Z": use_Z,
                     "cycles": cycles, "severity": severity,
@@ -641,7 +646,7 @@ def local_invasibility(V0, W0, Y0,
     im = plt.imshow(
         score_masked.T,
         origin='lower',
-        extent=[U_in_min, U_in_max, U_out_min, U_out_max],
+        extent=[U_in_min, U_in_max, U_size_min, U_size_max],
         aspect='auto',
         cmap=cmap,
         norm=norm,
@@ -649,13 +654,13 @@ def local_invasibility(V0, W0, Y0,
     )
 
     plt.xlabel('U_in')
-    plt.ylabel('U_out')
+    plt.ylabel('U_size')
     plt.title('Local invasibility (Number of invading neighbors)')
 
     # add gridlines that align with the coloured squares
     # compute the edges of the cells:
     x_edges = np.linspace(U_in_min, U_in_max, grid_size + 1)
-    y_edges = np.linspace(U_out_min, U_out_max, grid_size + 1)
+    y_edges = np.linspace(U_size_min, U_size_max, grid_size + 1)
     # draw vertical grid lines
     for x in x_edges:
         plt.axvline(x, color='black', linewidth=1, linestyle='-',
@@ -678,38 +683,38 @@ def local_invasibility(V0, W0, Y0,
     fname = os.path.join(folder, f'local_inv{idx}.pdf')
     plt.savefig(fname)
     plt.show()
-    return U_in_vals, U_out_vals, score, deltas, argsdict
+    return U_in_vals, U_size_vals, score, deltas, argsdict
 
-def test_local_invasion(U_in_vals, U_out_vals, deltas, test_point,
+def test_local_invasion(U_in_vals, U_size_vals, deltas, test_point,
                   
     V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
-    Z_in, Z_out,
+    Z_in, Z_size,
     extinction_rate, dt,
     use_X, use_Z,
     cycles, severity,
 ):
     X_vals = [
-    (U_in_vals[k], U_out_vals[l])
+    (U_in_vals[k], U_size_vals[l])
     for ((i, j), (k, l)), v in deltas.items()
     if (i == test_point[0] and j == test_point[1])
     ]
     
     U_vals = [
-    U_in_vals[test_point[0]], U_out_vals[test_point[1]]]
+    U_in_vals[test_point[0]], U_size_vals[test_point[1]]]
 
-    U_in, U_out = U_vals
+    U_in, U_size = U_vals
 
     for Xs in X_vals:
-        X_in, X_out = Xs
+        X_in, X_size = Xs
         
         run_invasion(
             V0, W0, Y0,
             W_birth, Y_birth,
             W_death, Y_death,
-            X_in, X_out,
-            U_in, U_out,
-            Z_in, Z_out,
+            X_in, X_size,
+            U_in, U_size,
+            Z_in, Z_size,
             extinction_rate, dt,
             use_X, use_Z,
             severity,
@@ -853,9 +858,9 @@ def reconstruct_and_flow_map(
 def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
                       W_birth, Y_birth,
                       W_death, Y_death,
-                      X_in, X_out,
-                      U_in, U_out, 
-                      Z_in, Z_out, 
+                      X_in, X_size,
+                      U_in, U_size, 
+                      Z_in, Z_size, 
                       duration, dt,
                       use_X=True, use_Z=False,
                       tol=1e-7,
@@ -871,7 +876,10 @@ def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
       X_array (unscaled), Z_array (unscaled),
       X_plot = X_array * X_scaler, Z_plot = Z_array * Z_scaler.
     """
-
+        
+    X_out =  X_in / X_size,
+    U_out =  U_in / U_size, 
+    Z_out =  Z_in / Z_size, 
 
     N = int(np.ceil(duration / dt)) + 1
     t = np.linspace(0.0, duration, N)
@@ -991,9 +999,9 @@ def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
     # Compute scalers for plotting (so the seedbank and active populations are on the same scale)
         
-    X_scaler = X_out / X_in 
-    Z_scaler = Z_out / Z_in 
-    U_scaler = U_out / U_in
+    X_scaler = X_out 
+    Z_scaler = Z_out 
+    U_scaler = U_out 
 
     X_plot = X * X_scaler
     Z_plot = Z * Z_scaler
@@ -1006,9 +1014,9 @@ def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
               W_birth, Y_birth,
               W_death, Y_death,
-              X_in, X_out,
-              U_in, U_out,
-              Z_in, Z_out,
+              X_in, X_size,
+              U_in, U_size,
+              Z_in, Z_size,
               Time=200.0, dt=0.1,
               use_X=True, use_Z=False,
               severity=0.5,
@@ -1032,8 +1040,8 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
         W_birth=W_birth, Y_birth=Y_birth,
         W_death=W_death, Y_death=Y_death,
         X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
+        X_size=X_size, Z_size=Z_size,
+        U_in=U_in, U_size=U_size,
         duration=perturb_time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -1061,8 +1069,8 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
         W_birth=W_birth, Y_birth=Y_birth,
         W_death=W_death, Y_death=Y_death,
         X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
+        X_size=X_size, Z_size=Z_size,
+        U_in=U_in, U_size=U_size,
         duration=Time, dt=dt,
         use_X=use_X, use_Z=use_Z,
         tol=tol,
@@ -1078,8 +1086,8 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
 
 
-    X_scaler = X_out/X_in
-    U_scaler = U_out/U_in
+    X_scaler = X_size
+    U_scaler = U_size
 
 
     # Time-series plot
@@ -1109,385 +1117,131 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
     return 
 
-def simulate_segment_competition(U0, V0, W0, X0, Y0, Z0,
-                      W_birth, Y_birth,
-                      W_death, Y_death,
-                      X_in, X_out,
-                      U_in, U_out, 
-                      Z_in, Z_out,
-                      Competition, 
-                      duration, dt,
-                      use_X=True, use_Z=False,
-                      tol=1e-7,
-                      stop_at_eq=True):
+
+def piplot(
+    V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_size,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=50,
+    U_in_min=0.01, U_in_max=0.99,
+    X_in_min=0.01, X_in_max=0.99, U_size_baseline=1,
+    perturb_W=False, perturb_Y=True, speedplot=False
+
+):
     """
-    Integrate from t=0 to t=duration with initial conditions
-      V(0)=V0, W(0)=W0, Y(0)=Y0, X(0)=X0, Z(0)=Z0.
-    If stop_at_eq=True, stops early when all |dV|,|dW|,|dY| (and |dX| if use_X, |dZ| if use_Z)
-    fall below tol. Otherwise, always runs full duration.
-    Returns:
-      t_array,
-      V_array, W_array, Y_array,
-      X_array (unscaled), Z_array (unscaled),
-      X_plot = X_array * X_scaler, Z_plot = Z_array * Z_scaler.
+    Generate a pairwise invasion plot (PIP) over U_in (x-axis) and X_in (y-axis).
+    Only computes for X_in >= U_in and mirrors symmetry.
+    Saves both continuous ΔW heatmap and binary invasion/failure plot without overwriting.
     """
+    # Prepare output folder
+    folder = 'pipSeedbank_plots'
+    os.makedirs(folder, exist_ok=True)
 
+    U_vals = np.linspace(U_in_min, U_in_max, grid_size)
+    X_vals = np.linspace(X_in_min, X_in_max, grid_size)
+    deltaW_matrix = np.zeros((grid_size, grid_size))
 
-    N = int(np.ceil(duration / dt)) + 1
-    t = np.linspace(0.0, duration, N)
+    for i, U_in in enumerate(tqdm(U_vals, desc="Scanning U_in")):
+        for j, X_in in enumerate(X_vals):
+            # Mirror diagonal
+            if j == i:
+                deltaW_matrix[j, i] = 0.0
+                continue
+            if X_in < U_in:
+                deltaW_matrix[j, i] = -deltaW_matrix[i, j]
+                continue
 
-    U = np.zeros(N)
-    V = np.zeros(N)
-    W = np.zeros(N)
-    X = np.zeros(N)
-    Y = np.zeros(N)
-    Z = np.zeros(N)
-
-    U[0] = U0
-    V[0] = V0
-    W[0] = W0
-    X[0] = X0
-    Y[0] = Y0
-    Z[0] = Z0
-
-    final_index = N - 1
-    for i in range(1, N):
-        Vi = V[i-1]
-        Wi = W[i-1]
-        Yi = Y[i-1]
-        Xi = X[i-1]
-        Zi = Z[i-1]
-        Ui = U[i-1]
-
-        # dV/dt, dW/dt
-        dV = W_birth * Vi * Yi - W_death * Vi - Competition * (Vi + Wi) * Vi * Yi
-        dW = W_birth * Wi * Yi - W_death * Wi - Competition * (Vi + Wi) * Wi * Yi
-
-        # dY/dt
-        dY = Y_birth * (1 - Yi) * Yi * (Vi + Wi) - Y_death * Yi
-
-        # X-coupling
-        if use_X:
-            dW += X_out * Xi - X_in * Wi
-        # U-coupling
-            dV += U_out * Ui - U_in * Vi
-        # Z-coupling
-        if use_Z:
-            dY += Z_out * Zi - Z_in * Yi
-
-        # seed bank dynamics 
-        dX = - X_out * Xi + X_in * Wi
-        dU = - U_out * Ui + U_in * Vi
-        dZ = - Z_out * Zi + Z_in * Yi
-
-
-        # If stop_at_eq=True, check for equilibrium
-        if stop_at_eq:
-            cond = (abs(dV) < tol and abs(dW) < tol and abs(dY) < tol)
-            if use_X:
-                cond &= abs(dX) < tol
-            if use_Z:
-                cond &= abs(dZ) < tol
-            if cond:
-                final_index = i - 1
-                break
-
-        # Euler update
-        V[i] = Vi + dt * dV
-        W[i] = Wi + dt * dW
-        Y[i] = Yi + dt * dY
-        X[i] = Xi + dt * dX
-        Z[i] = Zi + dt * dZ
-        U[i] = Ui + dt * dU
-
-        # Enforce nonnegativity (just to be sure to not have rounding errors)
-        V[i] = max(V[i], 0.0)
-        W[i] = max(W[i], 0.0)
-        Y[i] = max(Y[i], 0.0)
-        X[i] = max(X[i], 0.0)
-        Z[i] = max(Z[i], 0.0)
-        U[i] = max(U[i], 0.0)
-
-    
-
-    # Truncate arrays if we stopped early
-    t = t[: final_index + 1]
-    V = V[: final_index + 1]
-    W = W[: final_index + 1]
-    Y = Y[: final_index + 1]
-    X = X[: final_index + 1]
-    Z = Z[: final_index + 1]
-    U = U[: final_index + 1]
-
-
-
-    # Compute scalers for plotting (so the seedbank and active populations are on the same scale)
-        
-    X_scaler = X_out / X_in 
-    Z_scaler = Z_out / Z_in 
-    U_scaler = U_out / U_in
-
-    X_plot = X * X_scaler
-    Z_plot = Z * Z_scaler
-    U_plot = U * U_scaler
-
-
-
-    return t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot
-
-def run_invasion_competition(V0, W0, Y0,
+            # Compute ΔW via run_invasion
+            deltaW = run_invasion(
+             V0, W0, Y0,
                W_birth, Y_birth,
                W_death, Y_death,
-               X_in, X_out,
-               U_in, U_out,
-               Z_in, Z_out,
-               Competition,
-               extinction_rate, dt,
-               use_X, use_Z,
-               severity,
-               cycles=10000,
-               perturb_W=False,
-               perturb_Y=True,
-               plot=False,
-               stop=None,
-               break_threshold=0.01, show_Y=False):
-    """
-    Run 'cycles' successive calls to simulate_segment, each time:
-      1) simulate_segment(...) → (t, V_arr, W_arr, Y_arr, X_arr, Z_arr)
-      2) record final V, W, Y
-      3) if perturb_W: set W0_next = (1-severity)*W_final and
-                         V0_next = (1-severity)*V_final
-      4) if perturb_Y: set Y0_next = (1-severity)*Y_final
-      5) X0_next = X_final, Z0_next = Z_final
-    After all cycles, plot cycle index vs final W, V, and Y.
-    Returns lists of final values [V_finals, W_finals, Y_finals].
-    """
+               X_in, U_size_baseline,
+               U_in, U_size_baseline,
+               Z_in, Z_size,
+                extinction_rate, dt,
+                use_X, use_Z,
+                severity,
+                cycles,
+                perturb_W,
+                perturb_Y,
+                plot=False
+            )
 
-    #get equilibrium seedbank sizes
+            
+            deltaW_matrix[j, i] = deltaW
+    if speedplot:
+        # Continuous heatmap: determine next filename index
+        cont_pattern = os.path.join(folder, 'pip_speed*.pdf')
+        existing_cont = glob.glob(cont_pattern)
+        cont_idxs = []
+        for p in existing_cont:
+            m = re.match(r'.*pip_speed(\d*)\.pdf$', os.path.basename(p))
+            if m:
+                idx = int(m.group(1)) if m.group(1) else 0
+                cont_idxs.append(idx)
+        next_cont = max(cont_idxs) + 1 if cont_idxs else 0
+        cont_fname = f'pip_speed{next_cont}.pdf'
 
-    X0 = W0 / (X_out / X_in)
-    U0 = V0 / (U_out / U_in)
-    Z0 = Y0 / (Z_out /Z_in)
-
-    U_current = U0
-    V_current = V0
-    W_current = W0
-    X_current = X0
-    Y_current = Y0
-    Z_current = Z0
-    
-    V_finals = []
-    W_finals = []
-    Y_finals = []
-
-    for n in range(1, cycles+1):
-
-        # 1) simulate one segment
-        t, U, V, W, X, Y, Z, X_plot, Z_plot, U_plot = simulate_segment_competition(
-            V0=V_current, W0=W_current, Y0=Y_current, X0=X_current, Z0=Z_current, U0=U_current,
-            W_birth=W_birth, Y_birth=Y_birth, W_death=W_death, Y_death=Y_death,
-            X_in=X_in, Z_in=Z_in, X_out=X_out, Z_out=Z_out, U_in=U_in, U_out=U_out,
-            duration=extinction_rate, dt=dt, Competition=Competition,
-            use_X=use_X, use_Z=use_Z,
-            tol=1e-7,
-            stop_at_eq=True
+        plt.figure(figsize=(8, 6))
+        im = plt.imshow(
+            deltaW_matrix,
+            origin='lower',
+            extent=[U_in_min, U_in_max, X_in_min, X_in_max],
+            aspect='auto'
         )
-
-        # 2) record final values of the segment
-        V_final = V[-1]
-        W_final = W[-1]
-        Y_final = Y[-1]
-
-        V_finals.append(V_final)
-        W_finals.append(W_final)
-        Y_finals.append(Y_final)
-
-        # burn in, if the extinction rate is faster then the return to equilibrium, the population values drop uniformly
-        if n == 50:
-            W0 = W_final
-
-        # break threshold to accelerate the computation (if we grow by some amount, we expect it to grow fully)
-        
-        if (abs(W_final - W0) > break_threshold) and n > 50:
-            break
-
-        # 3) perturb for next cycle (extinction event)
-        if perturb_W:
-            V_current = (1 - severity) * V_final
-            W_current = (1 - severity) * W_final
-        else:
-            V_current = V_final
-            W_current = W_final
-
-        if perturb_Y:
-            Y_current = (1 - severity) * Y_final
-        else:
-            Y_current = Y_final
-
-        # 4) carry over X, Z unchanged
-        X_current = X[-1]
-        Z_current = Z[-1]
-        U_current = U[-1]
-
-
-    if plot:
-        # plot all three on one figure
-        cycles_idx = np.arange(1, n+1)
-        plt.figure(figsize=(8, 5))
-        plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
-        plt.plot(cycles_idx, V_finals, label='V', color='orange')
-        if show_Y:
-            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
-        plt.xlabel('Cycle', fontsize=12)
-        plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
-        titlestr += ', W Perturbed, ' if perturb_W else ''
-        titlestr += ', Y perturbed, ' if perturb_Y else ''
-        titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
-            U_in, U_out, X_in, X_out)
-        plt.title(titlestr, fontsize=14)
-
-        plt.legend()
-        plt.grid(True)
+        plt.xlabel('U_in')
+        plt.ylabel('X_in')
+        plt.title(f'Pairwise Invasion Plot: ΔW after {cycles} cycles')
+        cbar = plt.colorbar(im)
+        cbar.set_label('ΔW (positive: invasion; negative: failure)')
         plt.tight_layout()
-
-        # Saving the plot
-        
-        folder = "run_invasion"
-        os.makedirs(folder, exist_ok=True)
-        base = "run_invasion"
-        pattern = os.path.join(folder, base + "*.pdf")
-        existing = glob.glob(pattern)
-        if not existing:
-            pdf_name = base + ".pdf"
-        else:
-            taken = set(int(os.path.basename(p).replace(base,"").replace(".pdf","") or 0)
-                        for p in existing if os.path.basename(p).replace(base,"").replace(".pdf","").isdigit() or p.endswith(base+".pdf"))
-            k=0
-            while k in taken:
-                k+=1
-            pdf_name=f"{base}{k}.pdf"
-        path = os.path.join(folder, pdf_name)
-        plt.savefig(path)
-        print(f"Saved run_invasion plot to {path}")
-
+        plt.savefig(os.path.join(folder, cont_fname))
         plt.show()
 
-    return W_final - W0
+    # Binary plot: determine next filename index
+    bin_pattern = os.path.join(folder, 'pip*.pdf')
+    existing_bin = glob.glob(bin_pattern)
+    bin_idxs = []
+    for p in existing_bin:
+        m = re.match(r'.*pip(\d*)\.pdf$', os.path.basename(p))
+        if m:
+            idx = int(m.group(1)) if m.group(1) else 0
+            bin_idxs.append(idx)
+    next_bin = max(bin_idxs) + 1 if bin_idxs else 0
+    bin_fname = f'pip{next_bin}.pdf'
 
-def plot_segment_competition(U0, V0, W0, X0, Y0, Z0,
-              W_birth, Y_birth,
-              W_death, Y_death,
-              X_in, X_out,
-              U_in, U_out,
-              Z_in, Z_out,
-              Competition,
-              Time=200.0, dt=0.1,
-              use_X=True, use_Z=False,
-              severity=0.5,
-              perturb_W=False, perturb_Y=True,
-              perturb_time=20.0,
-              tol=1e-7, plot_Y=False):
-    """
-    Build a time-series plot for a fixed W0 using perturbation multiplier = (1 - severity).
-    1) Compute (W_eq, Y_eq).
-    2) Verify W0 ∈ [0, W_eq], then set V0 = W_eq - W0, X0, Z0.
-    3) Stage A: simulate from t=0 → perturb_time (no stopping).
-    4) At t=0 apply perturbation: V_mid=(1-severity)*V_eq_pre, etc.
-    5) Stage B: simulate from t=0 → Time (no stopping).
-    6) Concatenate and plot V, W, Y, X, Z over t ∈ [-perturb_time, Time].
-    Returns results dict.
-    """
+    category = np.zeros_like(deltaW_matrix, dtype=int)
+    category[deltaW_matrix <  0] = 0
+    category[deltaW_matrix == 0] = 1
+    category[deltaW_matrix >  0] = 2
 
-    # Stage A, part to ensure, that we start at equilibrium
-    t_pre, U_pre, V_pre, W_pre, X_pre, Y_pre, Z_pre, X_pre_plot, Z_pre_plot, U_pre_plot = simulate_segment_competition(
-        V0=V0, W0=W0, Y0=Y0, X0=X0, Z0=Z0, U0=U0,
-        W_birth=W_birth, Y_birth=Y_birth,
-        W_death=W_death, Y_death=Y_death,
-        X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
-        Competition=Competition,
-        duration=perturb_time, dt=dt,
-        use_X=use_X, use_Z=use_Z,
-        tol=tol,
-        stop_at_eq=False
+    # 2. Create a colormap that maps:
+    #    0 → white, 1 → black, 2 → 0.5 gray
+    cmap = ListedColormap(['white', 'black', 'gray'])
+
+    # 3. Plot with imshow, ensuring no interpolation and correct extent:
+    plt.figure(figsize=(8, 8))
+    plt.imshow(
+        category,
+        origin='lower',
+        extent=[U_in_min, U_in_max, X_in_min, X_in_max],
+        aspect='auto',
+        cmap=cmap,
+        vmin=0, vmax=2
     )
-
-    # make the time coherent
-    t_pre_shifted = t_pre - perturb_time
-
-    V_eq_pre = V_pre[-1]
-    W_eq_pre = W_pre[-1]
-    Y_eq_pre = Y_pre[-1]
-    X_eq_pre = X_pre_plot[-1]
-    U_eq_pre = U_pre_plot[-1]
-    Z_eq_pre = Z_pre_plot[-1]
-
-    # (4) apply perturbation multiplier = (1 - severity)
-    V_mid = ((1 - severity) * V_eq_pre) if perturb_W else V_eq_pre
-    W_mid = ((1 - severity) * W_eq_pre) if perturb_W else W_eq_pre
-    Y_mid = ((1 - severity) * Y_eq_pre) if perturb_Y else Y_eq_pre
-
-    # Stage B
-    t_post, U, V_post, W_post, X, Y_post, Z, X_post_plot, Z_post_plot, U_post_plot = simulate_segment_competition(
-        V0=V_mid, W0=W_mid, Y0=Y_mid, X0=X_pre[-1], Z0=Z_pre[-1], U0=U_pre[-1],
-        W_birth=W_birth, Y_birth=Y_birth,
-        W_death=W_death, Y_death=Y_death,
-        X_in=X_in, Z_in=Z_in,
-        X_out=X_out, Z_out=Z_out,
-        U_in=U_in, U_out=U_out,
-        Competition=Competition,
-        duration=Time, dt=dt,
-        use_X=use_X, use_Z=use_Z,
-        tol=tol,
-        stop_at_eq=False
-    )
-
-    t_full = np.concatenate((t_pre_shifted, t_post))
-    U_full = np.concatenate((U_pre_plot, U_post_plot))
-    V_full = np.concatenate((V_pre, V_post))
-    W_full = np.concatenate((W_pre, W_post))
-    Y_full = np.concatenate((Y_pre, Y_post))
-    X_full = np.concatenate((X_pre_plot, X_post_plot))
-
-
-    W_final = W_full[-1]
-
-    delta_W_test = W_final - W_eq_pre
-
-    X_scaler = X_out/X_in
-    U_scaler = U_out/U_in
-
-
-    # Time-series plot
-    plt.figure(figsize=(8, 5))
-    if use_X:
-        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} 'r'$X(t)$ (seedbank of W)', color='lime', linewidth=1.5)
-        plt.plot(t_full, U_full, label=f'{U_scaler:.1f} 'r'$U(t)$ (seedbank of V)', color='gold', linewidth=1.5)
-    if plot_Y:
-        plt.plot(t_full, Y_full, label=r'$Y(t)$', color='darkblue', linewidth=1.5)
-    plt.plot(t_full, V_full, label=r'$V(t)$', color='orange', linewidth=1.5)
-    plt.plot(t_full, W_full, label=r'$W(t)$', color='darkgreen', linewidth=1.5)
-
-
-    plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('Population', fontsize=12)
-    plt.title(
-        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
-        + rf'$\Delta W = {delta_W_test:.4f}$',
-        fontsize=14
-    )
-    plt.legend(loc='best', fontsize=9)
-    plt.grid(True)
+    plt.xlabel('Resident Seedbank Rate')
+    plt.ylabel('Mutant Seedbank Rate')
+    plt.title(f'Invasion (gray) and Extinction (white) of Mutant (Seedbank Size: {U_size_baseline})')
     plt.tight_layout()
-    plt.savefig('/Users/xaverwangerpohl/Documents/GitHub/master-code/SegmentPlots/segment.pdf', format='pdf')
+    plt.savefig(os.path.join(folder, bin_fname))
     plt.show()
-    print(delta_W_test)
-    
 
-    return 
+    return U_vals, X_vals, deltaW_matrix
+
 
 
 
