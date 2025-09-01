@@ -7,6 +7,28 @@ import argparse
 import matplotlib.pyplot as plt
 import os
 import sys
+import matplotlib as mpl
+
+
+
+
+# LaTeX: Times-like math (newtxmath) + Computer Modern text
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = ['CMU Serif', 'Computer Modern Roman', 'DejaVu Serif', 'Times New Roman', 'Times']
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = r'\usepackage{newtxmath}'
+# Legend appearance: slightly opaque background
+mpl.rcParams['legend.framealpha'] = .9
+# PGF export configuration (pdflatex + newtxmath)
+mpl.rcParams['pgf.texsystem'] = 'pdflatex'
+mpl.rcParams['pgf.preamble'] = r'\usepackage{newtxmath}'
+plt.rcParams['axes.titlesize'] = 14
+width_pt = 390
+inches_per_pt = 1.0/72.27
+golden_ratio = (5**.5 - 1) / 2  # aesthetic figure height
+
+fig_width = width_pt * inches_per_pt  # width in inches
+fig_height = fig_width * golden_ratio # height in inches
 
 # Determine the directory one level up
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -119,7 +141,7 @@ def plot_all_species_trajectories(npz_file: str = 'results_all.npz',
 
     # 4) Loop over species and plot
     for idx, sp in enumerate(species):
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(fig_width, fig_height))
 
         print(all_data[:, :, idx].min())
         
@@ -146,8 +168,8 @@ def plot_all_species_trajectories(npz_file: str = 'results_all.npz',
         plt.tight_layout()
 
         # 6) Save as PDF
-        out_path = os.path.join(output_dir, f'{sp}_trajectories.pdf')
-        plt.savefig(out_path)
+        out_path = os.path.join(output_dir, f'{sp}_trajectories.test.png')
+        plt.savefig(out_path, dpi=300)
         plt.close()
 
     print(f"Saved trajectory plots (with extinction %) for species: {', '.join(species)}\n"
@@ -189,15 +211,15 @@ def plot_VWY_trajectories(npz_file: str = 'results_all.npz',
     plt.title(f"V, W, Y trajectories ({title} extinct)")
     plt.xlabel('Time'); plt.ylabel('Count')
     plt.legend(); plt.tight_layout()
-    out = os.path.join(output_dir,'VWY_trajectories.pdf')
-    plt.savefig(out); plt.close()
+    out = os.path.join(output_dir,'VWY_trajectories_test.pdf')
+    plt.savefig(out, dpi=300); plt.close()
     print(f"Saved VWY plot to {out}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Parallel Gillespie sims for all species")
     parser.add_argument('--n-reps',   type=int,   default=1000, help="Number of trajectories")
-    parser.add_argument('--t-end',    type=float, default=10000.0, help="End time")
+    parser.add_argument('--t-end',    type=float, default=1000.0, help="End time")
     parser.add_argument('--n-points', type=int,   default=500,   help="Output intervals")
     parser.add_argument('--cpus',     type=int,   default=os.cpu_count(), help="Worker count")
     parser.add_argument('--out',      type=str,   default='results_all.npz', help="Output file")
