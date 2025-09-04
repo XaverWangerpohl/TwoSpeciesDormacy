@@ -333,8 +333,8 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
-        + rf'$\Delta W = {delta_W_test:.4f}$',
+        f"Modeling of a {(severity*100):.0f}% Extinction Event on {PLOT_LABELS['W']} and {PLOT_LABELS['V']} (" + PLOT_LABELS['Y'] + ")" + '\n'
+        + rf'$\\Delta W = {delta_W_test:.4f}$',
         fontsize=14
     )
     plt.legend(loc='best', fontsize=9)
@@ -451,7 +451,7 @@ def run_invasion(V0, W0, Y0,
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(

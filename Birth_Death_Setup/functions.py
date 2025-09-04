@@ -49,8 +49,8 @@ global_invasibility captures which parameters lead to invasion given a fixed (te
 
 # Unified LaTeX labels for species
 PLOT_LABELS = {
-    'U': r'$\\widetilde{W}^d$',
-    'V': r'$\\widetilde{W}^a$',
+    'U': r'$\widetilde{W}^d$',
+    'V': r'$\widetilde{W}^a$',
     'W': r'$W^a$',
     'X': r'$W^d$',
     'Y': r'$Y$',
@@ -58,26 +58,23 @@ PLOT_LABELS = {
 }
 
 TIME_LABELS = {
-    'U': r'$\\widetilde{W}^d(t)$',
-    'V': r'$\\widetilde{W}^a(t)$',
-    'W': r'$W^a(t)$',
-    'X': r'$W^d(t)$',
-    'Y': r'$Y(t)$',
-    'Z': r'$Z(t)$',
+    'U': r'$\widetilde{W}^d$',
+    'V': r'$\widetilde{W}^a$',
+    'W': r'$W^a$',
+    'X': r'$W^d$',
+    'Y': r'$Y$',
+    'Z': r'$Z$',
 }
 
 DERIV_LABELS = {
-    'U': r'$d\\widetilde{W}^d(t)$',
-    'V': r'$d\\widetilde{W}^a(t)$',
-    'W': r'$dW^a(t)$',
-    'X': r'$dW^d(t)$',
-    'Y': r'$dY(t)$',
-    'Z': r'$dZ(t)$',
+    'U': r'$d\widetilde{W}^d$',
+    'V': r'$d\widetilde{W}^a$',
+    'W': r'$dW^a$',
+    'X': r'$dW^d$',
+    'Y': r'$dY$',
+    'Z': r'$dZ$',
 }
     
-        
-
-
 def compute_equilibrium(W_birth, W_death, Y_birth, Y_death):
     """
     Compute the positive nontrivial equilibrium (W_eq, Y_eq) by solving:
@@ -314,21 +311,21 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     # Time-series plot
     plt.figure(figsize=(fig_width,fig_height))
     if use_X:
-        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} ' + TIME_LABELS['X'] + ' (seedbank of W)', color='lime', linewidth=1.5)
-        # plt.plot(t_full, U_full, label=f'{U_scaler:.1f} ' + TIME_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1.5)
+        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} ' + TIME_LABELS['X'], color='lime', linewidth=1)
+        # plt.plot(t_full, U_full, label=f'{U_scaler:.1f} ' + TIME_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1)
     if plot_Y:
-        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1.5)
-    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1.5)
-    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1)
+    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1)
+    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('Population', fontsize=12)
+    plt.xlabel('Time', fontsize=10)
+    plt.ylabel('Population', fontsize=10)
     plt.title(
-        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
+        f"Modeling of a {(severity*100):.0f}\% Extinction Event on " + (f"{PLOT_LABELS['W']} and {PLOT_LABELS['V']}" if perturb_W else f"{PLOT_LABELS['Y']}") + '\n'
         + rf'$\Delta W = {delta_W_test:.4f}$',
-        fontsize=14
+        fontsize=12
     )
     plt.legend(loc='best', fontsize=9)
     plt.grid(True)
@@ -444,7 +441,7 @@ def run_invasion(V0, W0, Y0,
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
@@ -1134,19 +1131,19 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
     # Time-series plot
     plt.figure(figsize=(fig_width,fig_height))
     if use_X:
-        plt.plot(t_full, DX_full, label=DERIV_LABELS['X'] + ' (seedbank of W)', color='lime', linewidth=1.5)
-        plt.plot(t_full, DU_full, label=DERIV_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1.5)
+        plt.plot(t_full, DX_full, label=DERIV_LABELS['X'], color='lime', linewidth=1)
+        plt.plot(t_full, DU_full, label=DERIV_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1)
     if plot_Y:
-        plt.plot(t_full, DY_full, label=DERIV_LABELS['Y'], color='darkblue', linewidth=1.5)
-    plt.plot(t_full, DV_full, label=DERIV_LABELS['V'], color='orange', linewidth=1.5)
-    plt.plot(t_full, DW_full, label=DERIV_LABELS['W'], color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, DY_full, label=DERIV_LABELS['Y'], color='darkblue', linewidth=1)
+    plt.plot(t_full, DV_full, label=DERIV_LABELS['V'], color='orange', linewidth=1)
+    plt.plot(t_full, DW_full, label=DERIV_LABELS['W'], color='darkgreen', linewidth=1)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $W$ and $V$ (Y latent)',
+        f"Modeling of a {(severity*100):.0f}\\% Extinction Event on {PLOT_LABELS['W']} and {PLOT_LABELS['V']} (" + PLOT_LABELS['Y'] + ")",
         fontsize=14
     )
     plt.legend(loc='best', fontsize=9)
@@ -1389,7 +1386,7 @@ def run_invasion_competition(V0, W0, Y0,
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
@@ -1512,19 +1509,19 @@ def plot_segment_competition(U0, V0, W0, X0, Y0, Z0,
     # Time-series plot
     plt.figure(figsize=(fig_width,fig_height))
     if use_X:
-        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} ' + TIME_LABELS['X'] + ' (seedbank of W)', color='lime', linewidth=1.5)
-        plt.plot(t_full, U_full, label=f'{U_scaler:.1f} ' + TIME_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1.5)
+        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} ' + TIME_LABELS['X'], color='lime', linewidth=1)
+        plt.plot(t_full, U_full, label=f'{U_scaler:.1f} ' + TIME_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1)
     if plot_Y:
-        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1.5)
-    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1.5)
-    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1)
+    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1)
+    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        rf'Modeling of a {(severity*100):.0f}% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
+        rf'Modeling of a {(severity*100):.0f}\% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
         + rf'$\Delta W = {delta_W_test:.4f}$',
         fontsize=14
     )

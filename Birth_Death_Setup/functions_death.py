@@ -317,7 +317,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        f'Time Series at $W_{0} = {W0:.4f}$ (severity={severity:.2f})\n'
+        f'Time Series at $W^a_0 = {W0:.4f}$ (severity={severity:.2f})\n'
         + rf'$\Delta W_{{\mathrm{{test}}}} = {delta_W_test:.4f}$',
         fontsize=14
     )
@@ -447,7 +447,7 @@ def run_invasion(V0, W0, Y0,
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
@@ -601,7 +601,7 @@ def run_invasion_long(V0, W0, Y0,
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
-        titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
+        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
         titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(

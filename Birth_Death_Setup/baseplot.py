@@ -34,17 +34,17 @@ X_out = 0.1
 Z_in = 0.1
 Z_out = 0.1
 
-Time = 400.0
+Time = 200.0
 
 use_X = True
 use_Z = False
 
 num_points = 200
-severity = 0.2
+severity = 0.5
 cycles = 2000
 extinction_rate = 100
-U_in, U_out = (.1, 1)
-X_in, X_out = (.1,0.01)
+U_in, U_out = (.0000000001, 1)
+X_in, X_out = (.1,000.1)
 
 # calculate starting values
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     # test of run_segment function
 
-    plot_segment_competition(U0, V0, W0, X0, Y0, Z0,W_birth, Y_birth,W_death, Y_death,X_in, X_out,U_in, U_out,Z_in, Z_out, Competition,Time=Time, dt=dt,use_X=True, use_Z=False,severity=severity,perturb_W=True, perturb_Y=False,perturb_time=500.0,tol=1e-7)
+    plot_segment(U0, V0, W0, X0, Y0, Z0,W_birth, Y_birth,W_death, Y_death,X_in, X_out,U_in, U_out,Z_in, Z_out,Time=Time, dt=dt,use_X=True, use_Z=False,severity=severity,perturb_W=False, perturb_Y=True,perturb_time=10.0,tol=1e-7, plot_Y=False)
 
     # test of run invasion function
 

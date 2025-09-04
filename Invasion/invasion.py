@@ -418,7 +418,7 @@ def compare_severities(W_birth, Y_birth, W_death, Y_death,
     else:
         perturb = "Y"
     ax.axhline(0.0, color='black', linestyle='--', linewidth=1)
-    ax.set_xlabel(r'$W_{0}$', fontsize=12)
+    ax.set_xlabel(r'$W^a_0$', fontsize=12)
     ax.set_ylabel(r'$\Delta W$', fontsize=12)
     ax.set_title(f'ΔW vs W₀ ({perturb} extinction)', fontsize=14)
     ax.grid(True)
@@ -566,7 +566,7 @@ def test_plot(W_birth, Y_birth, W_death, Y_death,
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        f'Time Series at $W_{0} = {W0:.4f}$ (severity={severity:.2f})\n'
+        f'Time Series at $W^a_0 = {W0:.4f}$ (severity={severity:.2f})\n'
         + rf'$\Delta W_{{\mathrm{{test}}}} = {delta_W_test:.4f}$',
         fontsize=14
     )
@@ -690,7 +690,7 @@ def test_plot2(U0, V0, W0, X0, Y0, Z0,
     plt.xlabel('Time', fontsize=12)
     plt.ylabel('Population', fontsize=12)
     plt.title(
-        f'Time Series at $W_{0} = {W0:.4f}$ (severity={severity:.2f})\n'
+        f'Time Series at $W^a_0 = {W0:.4f}$ (severity={severity:.2f})\n'
         + rf'$\Delta W_{{\mathrm{{test}}}} = {delta_W_test:.4f}$',
         fontsize=14
     )
@@ -837,7 +837,7 @@ def compare_scalers(W_birth, Y_birth, W_death, Y_death,
     else:
         perturb = "Y"
     ax.axhline(0.0, color='black', linestyle='--', linewidth=1)
-    ax.set_xlabel(r'$W_{0}$', fontsize=12)
+    ax.set_xlabel(r'$W^a_0$', fontsize=12)
     ax.set_ylabel(r'$\Delta W$', fontsize=12)
     ax.set_title(f'ΔW vs W₀ ({perturb} extinction)', fontsize=14)
     ax.grid(True)
@@ -2078,7 +2078,3 @@ def local_invasibility_heatmap(V0, W0, Y0,
     plt.savefig(fname)
     plt.show()
     return U_in_vals, U_out_vals, score, deltas, argsdict
-
-
-
-
