@@ -11,6 +11,51 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures import ProcessPoolExecutor
+import matplotlib as mpl
+
+
+# LaTeX: Times-like math (newtxmath) + Computer Modern text
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = ['CMU Serif', 'Computer Modern Roman', 'DejaVu Serif', 'Times New Roman', 'Times']
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = r'\\usepackage{newtxmath}'
+# Legend appearance: slightly opaque background
+mpl.rcParams['legend.framealpha'] = .8
+# PGF export configuration (pdflatex + newtxmath)
+mpl.rcParams['pgf.texsystem'] = 'pdflatex'
+mpl.rcParams['pgf.preamble'] = r'\\usepackage{newtxmath}'
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['axes.labelsize'] = 10
+plt.rcParams['xtick.labelsize'] = 10
+plt.rcParams['ytick.labelsize'] = 10
+
+# Unified LaTeX labels for species
+PLOT_LABELS = {
+    'U': r'$\\widetilde{W}^d$',
+    'V': r'$\\widetilde{W}^a$',
+    'W': r'$W^a$',
+    'X': r'$W^d$',
+    'Y': r'$Y$',
+    'Z': r'$Z$',
+}
+
+TIME_LABELS = {
+    'U': r'$\\widetilde{W}^d(t)$',
+    'V': r'$\\widetilde{W}^a(t)$',
+    'W': r'$W^a(t)$',
+    'X': r'$W^d(t)$',
+    'Y': r'$Y(t)$',
+    'Z': r'$Z(t)$',
+}
+
+DERIV_LABELS = {
+    'U': r'$d\\widetilde{W}^d(t)$',
+    'V': r'$d\\widetilde{W}^a(t)$',
+    'W': r'$dW^a(t)$',
+    'X': r'$dW^d(t)$',
+    'Y': r'$dY(t)$',
+    'Z': r'$dZ(t)$',
+}
 
 
 
@@ -260,12 +305,12 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     # Time-series plot
     plt.figure(figsize=(8, 5))
     if use_X:
-        plt.plot(t_full, X_full, label=r'$X(t)$', color='lime', linewidth=1.5)
-        plt.plot(t_full, U_full, label=r'$U(t)$', color='gold', linewidth=1.5)
+        plt.plot(t_full, X_full, label=TIME_LABELS['X'], color='lime', linewidth=1.5)
+        plt.plot(t_full, U_full, label=TIME_LABELS['U'], color='gold', linewidth=1.5)
     if plot_Y:
-        plt.plot(t_full, Y_full, label=r'$Y(t)$', color='darkblue', linewidth=1.5)
-    plt.plot(t_full, V_full, label=r'$V(t)$', color='orange', linewidth=1.5)
-    plt.plot(t_full, W_full, label=r'$W(t)$', color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1.5)
+    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1.5)
+    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1.5)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
@@ -394,12 +439,12 @@ def run_invasion(V0, W0, Y0,
         # plot all three on one figure
         cycles_idx = np.arange(1, n+1)
         plt.figure(figsize=(8, 5))
-        plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
-        plt.plot(cycles_idx, U_finals, label='U', color='gold')
-        plt.plot(cycles_idx, V_finals, label='V', color='orange')
-        plt.plot(cycles_idx, X_finals, label='X', color='lime')
+        plt.plot(cycles_idx, W_finals, label=PLOT_LABELS['W'], color='darkgreen')
+        plt.plot(cycles_idx, U_finals, label=PLOT_LABELS['U'], color='gold')
+        plt.plot(cycles_idx, V_finals, label=PLOT_LABELS['V'], color='orange')
+        plt.plot(cycles_idx, X_finals, label=PLOT_LABELS['X'], color='lime')
         if show_Y:
-            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
+            plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
         titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
@@ -548,12 +593,12 @@ def run_invasion_long(V0, W0, Y0,
         # plot all three on one figure
         cycles_idx = np.arange(1, len(W_finals)+1)
         plt.figure(figsize=(8, 5))
-        plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
-        plt.plot(cycles_idx, U_finals, label='U', color='gold')
-        plt.plot(cycles_idx, V_finals, label='V', color='orange')
-        plt.plot(cycles_idx, X_finals, label='X', color='lime')
+        plt.plot(cycles_idx, W_finals, label=PLOT_LABELS['W'], color='darkgreen')
+        plt.plot(cycles_idx, U_finals, label=PLOT_LABELS['U'], color='gold')
+        plt.plot(cycles_idx, V_finals, label=PLOT_LABELS['V'], color='orange')
+        plt.plot(cycles_idx, X_finals, label=PLOT_LABELS['X'], color='lime')
         if show_Y:
-            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
+            plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
         titlestr = f'V, W, Y after each cycle\n(severity={severity}' 

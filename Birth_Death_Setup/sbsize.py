@@ -11,8 +11,59 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures import ProcessPoolExecutor
+import matplotlib as mpl
 
 
+# LaTeX: Times-like math (newtxmath) + Computer Modern text
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = ['CMU Serif', 'Computer Modern Roman', 'DejaVu Serif', 'Times New Roman', 'Times']
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = r'\usepackage{newtxmath}'
+# Legend appearance: slightly opaque background
+mpl.rcParams['legend.framealpha'] = .8
+# PGF export configuration (pdflatex + newtxmath)
+mpl.rcParams['pgf.texsystem'] = 'pdflatex'
+mpl.rcParams['pgf.preamble'] = r'\usepackage{newtxmath}'
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['axes.labelsize'] = 10
+plt.rcParams['xtick.labelsize'] = 10
+plt.rcParams['ytick.labelsize'] = 10
+
+width_pt = 390
+inches_per_pt = 1.0/72.27
+golden_ratio = (5**.5 - 1) / 2  # aesthetic figure height
+
+fig_width = width_pt * inches_per_pt  # width in inches
+fig_height = fig_width * golden_ratio # height in inches
+
+
+# Unified LaTeX labels for species
+PLOT_LABELS = {
+    'U': r'$\\widetilde{W}^d$',
+    'V': r'$\\widetilde{W}^a$',
+    'W': r'$W^a$',
+    'X': r'$W^d$',
+    'Y': r'$Y$',
+    'Z': r'$Z$',
+}
+
+TIME_LABELS = {
+    'U': r'$\\widetilde{W}^d(t)$',
+    'V': r'$\\widetilde{W}^a(t)$',
+    'W': r'$W^a(t)$',
+    'X': r'$W^d(t)$',
+    'Y': r'$Y(t)$',
+    'Z': r'$Z(t)$',
+}
+
+DERIV_LABELS = {
+    'U': r'$d\\widetilde{W}^d(t)$',
+    'V': r'$d\\widetilde{W}^a(t)$',
+    'W': r'$dW^a(t)$',
+    'X': r'$dW^d(t)$',
+    'Y': r'$dY(t)$',
+    'Z': r'$dZ(t)$',
+}
 
 
 ''''
@@ -268,14 +319,14 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
 
 
     # Time-series plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(fig_width,fig_height))
     if use_X:
-        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} 'r'$X(t)$ (seedbank of W)', color='lime', linewidth=1.5)
-        #plt.plot(t_full, U_full, label=f'{U_scaler:.1f} 'r'$U(t)$ (seedbank of V)', color='gold', linewidth=1.5)
+        plt.plot(t_full, X_full, label=f'{X_scaler:.1f} ' + TIME_LABELS['X'] + ' (seedbank of W)', color='lime', linewidth=1.5)
+        # plt.plot(t_full, U_full, label=f'{U_scaler:.1f} ' + TIME_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1.5)
     if plot_Y:
-        plt.plot(t_full, Y_full, label=r'$Y(t)$', color='darkblue', linewidth=1.5)
-    plt.plot(t_full, V_full, label=r'$V(t)$', color='orange', linewidth=1.5)
-    plt.plot(t_full, W_full, label=r'$W(t)$', color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, Y_full, label=TIME_LABELS['Y'], color='darkblue', linewidth=1.5)
+    plt.plot(t_full, V_full, label=TIME_LABELS['V'], color='orange', linewidth=1.5)
+    plt.plot(t_full, W_full, label=TIME_LABELS['W'], color='darkgreen', linewidth=1.5)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
@@ -393,11 +444,11 @@ def run_invasion(V0, W0, Y0,
     if plot:
         # plot all three on one figure
         cycles_idx = np.arange(1, n+1)
-        plt.figure(figsize=(8, 5))
-        plt.plot(cycles_idx, W_finals, label='W', color='darkgreen')
-        plt.plot(cycles_idx, V_finals, label='V', color='orange')
+        plt.figure(figsize=(fig_width,fig_height))
+        plt.plot(cycles_idx, W_finals, label=PLOT_LABELS['W'], color='darkgreen')
+        plt.plot(cycles_idx, V_finals, label=PLOT_LABELS['V'], color='orange')
         if show_Y:
-            plt.plot(cycles_idx, Y_finals, label='Y', color='darkblue')
+            plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
         plt.xlabel('Cycle', fontsize=12)
         plt.ylabel('Density', fontsize=12)
         titlestr = f'V, W, Y after each cycle\n(severity={severity}' 
@@ -642,7 +693,7 @@ def local_invasibility(V0, W0, Y0,
     bounds = np.arange(-0.5, 5.5, 1)     
     norm   = BoundaryNorm(bounds, cmap.N)
     # 6) Plot the result 
-    plt.figure(figsize=(9,8))
+    plt.figure(figsize=(fig_width,fig_height))
     im = plt.imshow(
         score_masked.T,
         origin='lower',
@@ -1091,14 +1142,14 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
 
     # Time-series plot
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(fig_width,fig_height))
     if use_X:
-        plt.plot(t_full, DX_full, label=f' 'r'$dX(t)$ (seedbank of W)', color='lime', linewidth=1.5)
-        plt.plot(t_full, DU_full, label=f' 'r'$dU(t)$ (seedbank of V)', color='gold', linewidth=1.5)
+        plt.plot(t_full, DX_full, label=DERIV_LABELS['X'] + ' (seedbank of W)', color='lime', linewidth=1.5)
+        plt.plot(t_full, DU_full, label=DERIV_LABELS['U'] + ' (seedbank of V)', color='gold', linewidth=1.5)
     if plot_Y:
-        plt.plot(t_full, DY_full, label=r'$dY(t)$', color='darkblue', linewidth=1.5)
-    plt.plot(t_full, DV_full, label=r'$dV(t)$', color='orange', linewidth=1.5)
-    plt.plot(t_full, DW_full, label=r'$dW(t)$', color='darkgreen', linewidth=1.5)
+        plt.plot(t_full, DY_full, label=DERIV_LABELS['Y'], color='darkblue', linewidth=1.5)
+    plt.plot(t_full, DV_full, label=DERIV_LABELS['V'], color='orange', linewidth=1.5)
+    plt.plot(t_full, DW_full, label=DERIV_LABELS['W'], color='darkgreen', linewidth=1.5)
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
@@ -1186,7 +1237,7 @@ def piplot(
         next_cont = max(cont_idxs) + 1 if cont_idxs else 0
         cont_fname = f'pip_speed{next_cont}.pdf'
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(fig_width,fig_height))
         im = plt.imshow(
             deltaW_matrix,
             origin='lower',
@@ -1224,7 +1275,7 @@ def piplot(
     cmap = ListedColormap(['white', 'black', 'gray'])
 
     # 3. Plot with imshow, ensuring no interpolation and correct extent:
-    plt.figure(figsize=(8, 8))
+    plt.figure(figsize=(fig_width,fig_height))
     plt.imshow(
         category,
         origin='lower',
@@ -1241,7 +1292,3 @@ def piplot(
     plt.show()
 
     return U_vals, X_vals, deltaW_matrix
-
-
-
-

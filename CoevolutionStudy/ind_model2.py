@@ -19,11 +19,17 @@ mpl.rcParams['font.serif'] = ['CMU Serif', 'Computer Modern Roman', 'DejaVu Seri
 mpl.rcParams['text.usetex'] = True
 mpl.rcParams['text.latex.preamble'] = r'\usepackage{newtxmath}'
 # Legend appearance: slightly opaque background
-mpl.rcParams['legend.framealpha'] = .9
+mpl.rcParams['legend.framealpha'] = .8
 # PGF export configuration (pdflatex + newtxmath)
 mpl.rcParams['pgf.texsystem'] = 'pdflatex'
 mpl.rcParams['pgf.preamble'] = r'\usepackage{newtxmath}'
-plt.rcParams['axes.titlesize'] = 14
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['axes.labelsize'] = 10
+plt.rcParams['xtick.labelsize'] = 10
+plt.rcParams['ytick.labelsize'] = 10
+
+
+
 width_pt = 390
 inches_per_pt = 1.0/72.27
 golden_ratio = (5**.5 - 1) / 2  # aesthetic figure height
@@ -130,25 +136,30 @@ def plot_VWY_trajectories(npz_file: str = 'results_all.npz',
         for rep in range(n_reps):
             plt.plot(times, all_data[rep,:,i], color=colors[sp], alpha=0.02, lw=0.5)
     # plot mean & compute extinction
-    labels = (r'$\widehat{W}^a$', r'$W^a$', r'$Y$')
+    labels = (r'$\widetilde{W}^a$', r'$W^a$', r'$Y$')
+    label_map = dict(zip(('V','W','Y'), labels))
     for sp,i in zip(('V','W','Y'), idxs):
         mean_traj = all_data[:,:,i].mean(axis=0)
-        plt.plot(times, mean_traj, color=colors[sp], lw=2, label=f'{sp} mean')
+        plt.plot(times, mean_traj, color=colors[sp], lw=1, label=label_map.get(sp, sp))
         extinct = np.sum((all_data[:,:,i]==0).any(axis=1))
         pct[sp] = extinct/n_reps*100
 
-    title = ', '.join(f"{sp}: {pct[sp]:.1f}%" for sp in pct)
-    plt.title("V, W (seedbank), Y trajectories ({title} extinct)")
-    plt.xlabel('Time'); plt.ylabel('Count')
-    plt.legend(); plt.tight_layout()
-    out = os.path.join(output_dir,'VWY_trajectories.png')
+    title = ', '.join(f"{label_map.get(sp, sp)}: {pct[sp]:.1f}%" for sp in pct)
+    title_text = fr"Trajectories for $K_{{pop}} = {size}$"
+    plt.title(title_text)
+    plt.xlabel('Time', fontsize=10)
+    plt.ylabel('Count', fontsize=10)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.legend(loc='upper right'); plt.tight_layout()
+    out = os.path.join(output_dir,f'VWY_trajectories_{size}.png')
     plt.savefig(out, dpi=300); plt.close()
     print(f"Saved VWY plot to {out}")
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--n-reps',   type=int,   default=100)
-    p.add_argument('--t-end',    type=float, default=1000.0)
+    p.add_argument('--t-end',    type=float, default=5000.0)
     p.add_argument('--n-points', type=int,   default=500)
     p.add_argument('--cpus',     type=int,   default=os.cpu_count())
     p.add_argument('--out',      type=str,   default='results_all.npz')
