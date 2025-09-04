@@ -8,7 +8,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from tqdm import tqdm
 import re
 
-from invasion import (compute_nontrivial_slice,
+from Invasion.invasion import (compute_nontrivial_slice,
                        run_invasion,
                     
                        )

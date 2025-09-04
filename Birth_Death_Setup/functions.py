@@ -47,6 +47,37 @@ global_invasibility captures which parameters lead to invasion given a fixed (te
 '''
 
 
+# Unified LaTeX labels for species
+PLOT_LABELS = {
+    'U': r'$\\widetilde{W}^d$',
+    'V': r'$\\widetilde{W}^a$',
+    'W': r'$W^a$',
+    'X': r'$W^d$',
+    'Y': r'$Y$',
+    'Z': r'$Z$',
+}
+
+TIME_LABELS = {
+    'U': r'$\\widetilde{W}^d(t)$',
+    'V': r'$\\widetilde{W}^a(t)$',
+    'W': r'$W^a(t)$',
+    'X': r'$W^d(t)$',
+    'Y': r'$Y(t)$',
+    'Z': r'$Z(t)$',
+}
+
+DERIV_LABELS = {
+    'U': r'$d\\widetilde{W}^d(t)$',
+    'V': r'$d\\widetilde{W}^a(t)$',
+    'W': r'$dW^a(t)$',
+    'X': r'$dW^d(t)$',
+    'Y': r'$dY(t)$',
+    'Z': r'$dZ(t)$',
+}
+    
+        
+
+
 def compute_equilibrium(W_birth, W_death, Y_birth, Y_death):
     """
     Compute the positive nontrivial equilibrium (W_eq, Y_eq) by solving:
@@ -185,38 +216,7 @@ def simulate_segment(U0, V0, W0, X0, Y0, Z0,
     Z = Z[: final_index + 1]
     U = U[: final_index + 1]
 
-
-
-
-# Unified LaTeX labels for species
-PLOT_LABELS = {
-    'U': r'$\\widetilde{W}^d$',
-    'V': r'$\\widetilde{W}^a$',
-    'W': r'$W^a$',
-    'X': r'$W^d$',
-    'Y': r'$Y$',
-    'Z': r'$Z$',
-}
-
-TIME_LABELS = {
-    'U': r'$\\widetilde{W}^d(t)$',
-    'V': r'$\\widetilde{W}^a(t)$',
-    'W': r'$W^a(t)$',
-    'X': r'$W^d(t)$',
-    'Y': r'$Y(t)$',
-    'Z': r'$Z(t)$',
-}
-
-DERIV_LABELS = {
-    'U': r'$d\\widetilde{W}^d(t)$',
-    'V': r'$d\\widetilde{W}^a(t)$',
-    'W': r'$dW^a(t)$',
-    'X': r'$dW^d(t)$',
-    'Y': r'$dY(t)$',
-    'Z': r'$dZ(t)$',
-}
     # Compute scalers for plotting (so the seedbank and active populations are on the same scale)
-        
     X_scaler = X_out / X_in 
     Z_scaler = Z_out / Z_in 
     U_scaler = U_out / U_in
