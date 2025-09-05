@@ -1168,7 +1168,6 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
     return 
 
-
 def piplot(
     V0, W0, Y0, 
     W_birth, Y_birth, W_death, Y_death,
@@ -1179,7 +1178,7 @@ def piplot(
     grid_size=50,
     U_in_min=0.01, U_in_max=0.99,
     X_in_min=0.01, X_in_max=0.99, U_size_baseline=1,
-    perturb_W=False, perturb_Y=True, speedplot=False
+    perturb_W=False, perturb_Y=True, speedplot=False, figure_title="Invasion (gray) and Extinction (white) of Mutant $\W^a$ "
 
 ):
     """
@@ -1242,14 +1241,19 @@ def piplot(
             deltaW_matrix,
             origin='lower',
             extent=[U_in_min, U_in_max, X_in_min, X_in_max],
-            aspect='auto'
+            # Enforce identical scaling for X and Y axes
+            aspect='equal'
         )
         plt.xlabel('U_in')
         plt.ylabel('X_in')
         plt.title(f'Pairwise Invasion Plot: ΔW after {cycles} cycles')
         cbar = plt.colorbar(im)
         cbar.set_label('ΔW (positive: invasion; negative: failure)')
-        plt.tight_layout()
+        if figure_title:
+            plt.suptitle(figure_title)
+            plt.tight_layout(rect=[0, 0, 1, 0.95])
+        else:
+            plt.tight_layout()
         plt.savefig(os.path.join(folder, cont_fname))
         plt.show()
 
@@ -1280,15 +1284,181 @@ def piplot(
         category,
         origin='lower',
         extent=[U_in_min, U_in_max, X_in_min, X_in_max],
-        aspect='auto',
+        # Enforce identical scaling for X and Y axes
+        aspect='equal',
         cmap=cmap,
         vmin=0, vmax=2
     )
-    plt.xlabel('Resident Seedbank Rate')
-    plt.ylabel('Mutant Seedbank Rate')
-    plt.title(f'Invasion (gray) and Extinction (white) of Mutant (Seedbank Size: {U_size_baseline})')
-    plt.tight_layout()
+    plt.xlabel(r'Resident rate $\alpha_W^{in}$')
+    plt.ylabel(r'Mutant rate $\alpha_{\widetilde{W}}^{in}$' )
+    plt.title(fr'Invasion (gray) and Extinction (white) of Mutant $W^a$' + '\n' + fr' ($\xi_W = {U_size_baseline})$')
+    if figure_title:
+        plt.suptitle(figure_title)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
     plt.savefig(os.path.join(folder, bin_fname))
     plt.show()
 
     return U_vals, X_vals, deltaW_matrix
+
+
+def compute_pip_deltaW_matrix(
+    V0, W0, Y0,
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_size,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=50,
+    U_in_min=0.01, U_in_max=0.99,
+    X_in_min=0.01, X_in_max=0.99,
+    U_size_baseline=1,
+    perturb_W=False, perturb_Y=True,
+):
+    """
+    Compute the ΔW matrix over a grid of resident (U_in) and mutant (X_in) seedbank rates.
+    Returns (U_vals, X_vals, deltaW_matrix) without plotting or saving.
+    """
+    U_vals = np.linspace(U_in_min, U_in_max, grid_size)
+    X_vals = np.linspace(X_in_min, X_in_max, grid_size)
+    deltaW_matrix = np.zeros((grid_size, grid_size))
+
+    for i, U_in in enumerate(tqdm(U_vals, desc="Scanning U_in")):
+        for j, X_in in enumerate(X_vals):
+            if j == i:
+                deltaW_matrix[j, i] = 0.0
+                continue
+            if X_in < U_in:
+                deltaW_matrix[j, i] = -deltaW_matrix[i, j]
+                continue
+
+            deltaW = run_invasion(
+                V0, W0, Y0,
+                W_birth, Y_birth,
+                W_death, Y_death,
+                X_in, U_size_baseline,
+                U_in, U_size_baseline,
+                Z_in, Z_size,
+                extinction_rate, dt,
+                use_X, use_Z,
+                severity,
+                cycles,
+                perturb_W,
+                perturb_Y,
+                plot=False,
+            )
+            deltaW_matrix[j, i] = deltaW
+
+    return U_vals, X_vals, deltaW_matrix
+
+
+def plot_pip_pair_from_matrices(
+    U_vals, X_vals,
+    matrices,
+    titles=None,
+    mode='binary',  # 'binary' or 'continuous'
+    out_folder='pipSeedbank_plots',
+    filename_prefix='pip_pair'
+):
+    """
+    Plot two PIP matrices side by side sharing the same axes and aspect ratio.
+    - matrices: list/tuple of two 2D arrays (ΔW matrices)
+    - titles: optional list/tuple of two strings for subplot titles
+    - mode: 'binary' for categorical (white/gray/black), 'continuous' for heatmap
+    Saves a combined PDF in out_folder with an incremented filename.
+    """
+    os.makedirs(out_folder, exist_ok=True)
+
+    extent = [U_vals.min(), U_vals.max(), X_vals.min(), X_vals.max()]
+    fig, axs = plt.subplots(1, 2, figsize=(fig_width, fig_height), sharex=True, sharey=True)
+
+    if titles is None:
+        titles = ["PIP (left)", "PIP (right)"]
+
+    for ax, mat, title in zip(axs, matrices, titles):
+        if mode == 'continuous':
+            im = ax.imshow(mat, origin='lower', extent=extent, aspect='equal')
+            cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+            cbar.set_label('ΔW')
+        else:
+            category = np.zeros_like(mat, dtype=int)
+            category[mat < 0] = 0
+            category[mat == 0] = 1
+            category[mat > 0] = 2
+            cmap_bin = ListedColormap(['white', 'black', 'gray'])
+            ax.imshow(category, origin='lower', extent=extent, aspect='equal', cmap=cmap_bin, vmin=0, vmax=2)
+
+        ax.set_title(title)
+        ax.set_xlabel(r'Resident rate $\alpha^{in}_{\widetilde{W}}$')
+        ax.set_aspect('equal', adjustable='box')
+
+    axs[0].set_ylabel(r'Mutant rate $\alpha^{in}_W$')
+    plt.tight_layout()
+
+    # Incrementing filename to avoid overwrite
+    pattern = os.path.join(out_folder, f'{filename_prefix}*.pdf')
+    existing = glob.glob(pattern)
+    idxs = []
+    for p in existing:
+        m = re.match(r'.*' + re.escape(filename_prefix) + r'(\d*)\.pdf$', os.path.basename(p))
+        if m:
+            idxs.append(int(m.group(1)) if m.group(1) else 0)
+    next_idx = max(idxs) + 1 if idxs else 0
+    fname = f'{filename_prefix}{next_idx}.pdf'
+    fig.savefig(os.path.join(out_folder, fname), bbox_inches='tight')
+    plt.show()
+
+    return fname
+
+
+def piplot_pair(
+    V0, W0, Y0,
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_size,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=50,
+    U_in_min=0.01, U_in_max=0.99,
+    X_in_min=0.01, X_in_max=0.99,
+    U_size_pair=(1, 10),
+    perturb_W=False, perturb_Y=True,
+    mode='binary',
+):
+    """
+    Compute two PIP ΔW matrices for two different U_size_baseline values and plot them side by side.
+    Returns (U_vals, X_vals, deltaW_matrix_left, deltaW_matrix_right, saved_filename)
+    """
+    (U_vals, X_vals, mat_left) = compute_pip_deltaW_matrix(
+        V0, W0, Y0,
+        W_birth, Y_birth, W_death, Y_death,
+        Z_in, Z_size,
+        extinction_rate, dt,
+        use_X, use_Z,
+        cycles, severity,
+        grid_size,
+        U_in_min, U_in_max,
+        X_in_min, X_in_max,
+        U_size_pair[0],
+        perturb_W, perturb_Y,
+    )
+
+    (_, _, mat_right) = compute_pip_deltaW_matrix(
+        V0, W0, Y0,
+        W_birth, Y_birth, W_death, Y_death,
+        Z_in, Z_size,
+        extinction_rate, dt,
+        use_X, use_Z,
+        cycles, severity,
+        grid_size,
+        U_in_min, U_in_max,
+        X_in_min, X_in_max,
+        U_size_pair[1],
+        perturb_W, perturb_Y,
+    )
+
+    titles = [rf'$\xi_W = {U_size_pair[0]}$', fr'$\xi_W = {U_size_pair[1]}$']
+    saved = plot_pip_pair_from_matrices(U_vals, X_vals, (mat_left, mat_right), titles=titles, mode=mode)
+
+    return U_vals, X_vals, mat_left, mat_right, saved

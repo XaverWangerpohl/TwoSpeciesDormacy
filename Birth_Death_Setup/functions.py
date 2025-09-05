@@ -325,7 +325,7 @@ def plot_segment(U0, V0, W0, X0, Y0, Z0,
     plt.title(
         f"Modeling of a {(severity*100):.0f}\% Extinction Event on " + (f"{PLOT_LABELS['W']} and {PLOT_LABELS['V']}" if perturb_W else f"{PLOT_LABELS['Y']}") + '\n'
         + rf'$\Delta W = {delta_W_test:.4f}$',
-        fontsize=12
+        fontsize=10
     )
     plt.legend(loc='best', fontsize=9)
     plt.grid(True)
@@ -439,14 +439,14 @@ def run_invasion(V0, W0, Y0,
         plt.plot(cycles_idx, V_finals, label=PLOT_LABELS['V'], color='orange')
         if show_Y:
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
-        plt.xlabel('Cycle', fontsize=12)
-        plt.ylabel('Density', fontsize=12)
-        titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
-        titlestr += ', W Perturbed, ' if perturb_W else ''
-        titlestr += ', Y perturbed, ' if perturb_Y else ''
-        titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
-            U_in, U_out, X_in, X_out)
-        plt.title(titlestr, fontsize=14)
+        plt.xlabel('Cycle', fontsize=10)
+        plt.ylabel('Population', fontsize=10)
+        titlestr = rf"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}" + (rf", and {PLOT_LABELS['Y']}" if show_Y else '') + rf" after each ${int(severity*100)}$\% extinction cycle"
+        titlestr += '\n'
+        titlestr += r'($W^a$ and $\widetilde{W}^a $ perturbed)' if perturb_W else ''
+        titlestr += r'($Y$ perturbed)' if perturb_Y else ''
+
+        plt.title(titlestr, fontsize=12)
 
         plt.legend()
         plt.grid(True)
@@ -594,7 +594,9 @@ def local_invasibility(V0, W0, Y0,
     U_in_min=0.01, U_in_max=0.4,
     U_out_min=0.01, U_out_max=0.4,
     folder='local_invasibility',
-    break_threshold=0.01
+    break_threshold=0.01,
+    perturb_W=False,
+    perturb_Y=True
 ):
     """
     For each interior gridpoint (i,j) on the plane U_in, U_out:
@@ -648,7 +650,7 @@ def local_invasibility(V0, W0, Y0,
                     "extinction_rate": extinction_rate, "dt": dt,
                     "use_X": use_X, "use_Z": use_Z,
                     "cycles": cycles, "severity": severity,
-                    "perturb_W": False, "perturb_Y": True,
+                    "perturb_W": perturb_W, "perturb_Y": perturb_Y,
                     "plot": False, "break_threshold": break_threshold
                     }
                     argsdict[((i,j), (i+di,j+dj))] = args
@@ -773,7 +775,8 @@ def reconstruct_and_flow_map(
     y_vals,
     folder='surface_flow',
     arrow_scale=20,
-    invert=False
+    invert=False,
+    figure_title=None
 ):
     """
     Reconstruct the scalar field f from sign data on a custom grid,
@@ -860,7 +863,7 @@ def reconstruct_and_flow_map(
     tested_y = [y_vals[j] for (_, j) in tested_nodes]
 
     # Plot quiver + tested data points
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width))
     q = ax.quiver(
         X, Y, fx_n, fy_n,
         speed,
@@ -871,11 +874,16 @@ def reconstruct_and_flow_map(
     #cbar = fig.colorbar(q, ax=ax)
     #cbar.set_label('|∇f| (vector magnitude)')
 
-    ax.set_xlabel('U in')
-    ax.set_ylabel('U out')
-    ax.set_title('Flow Map with Tested Data Points')
+    ax.set_xlabel(r'U in')
+    ax.set_ylabel(r'U out')
+    ax.set_title('Flow Map')
+    ax.set_aspect('equal', adjustable='box')
     ax.legend()
-    plt.tight_layout()
+    if figure_title:
+        fig.suptitle(figure_title)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
 
     # Save PDF
     pdf_path = os.path.join(folder, 'flow_map_tested_points.pdf')
@@ -895,6 +903,126 @@ def reconstruct_and_flow_map(
                 predicted_signs[((i, j), (ii, jj))] = int(sign)
 
     return predicted_signs
+
+def flow_map(V0, W0, Y0, 
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=5,
+    U_in_min=0.01, U_in_max=0.4,
+    U_out_min=0.01, U_out_max=0.4,
+    folder='local_invasibility',
+    break_threshold=0.01,
+    arrow_scale= 20
+):
+    """
+    Reconstruct the scalar field f from sign data on a custom grid,
+    compute its gradient, plot a quiver (flow) map of the gradient vectors
+    with adjustable arrow length, and overlay markers at every tested data point.
+
+    Parameters
+    ----------
+    signs : dict
+        Mapping edge tuples ((i,j),(ii,jj)) to sign values (+1 or -1).
+        Indices i in [0, len(x_vals)), j in [0, len(y_vals)).
+    x_vals : Sequence[float]
+        1D array of x-coordinates (length Nx).
+    y_vals : Sequence[float]
+        1D array of y-coordinates (length Ny).
+    folder : str
+        Directory to save the PDF of the flow map.
+    arrow_scale : float
+        Controls arrow length (smaller → longer).
+    invert : bool
+        If True, flip arrow directions (for sign convention).
+
+    Returns
+    -------
+    f : np.ndarray, shape (Nx, Ny)
+        Reconstructed scalar field.
+    fx, fy : np.ndarray, shape (Nx, Ny)
+        Partial derivatives ∂f/∂x and ∂f/∂y on the grid.
+    """
+    W,Y = compute_equilibrium(W_birth, W_death, Y_birth, Y_death)
+    W0 = W/2
+    V0 = W - W0
+    Y0 = Y
+    Z0 = Y0/ (Z_out /Z_in)
+
+    XY, YY, fx_nY, fy_nY, speedY,  = local_invasibility(
+    V0, W0, Y0,
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size= grid_size,
+    U_in_min  = U_in_min,
+    U_in_max  = U_in_max, 
+    U_out_min  = U_out_min, 
+    U_out_max  = U_out_max,
+    break_threshold=break_threshold,
+    perturb_Y=True,
+    perturb_W=False)
+
+    XW, YW, fx_nW, fW_nW, speedW, = local_invasibility(
+    V0, W0, Y0,
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_out,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=grid_size,
+    U_in_min  = U_in_min,
+    U_in_max  = U_in_max, 
+    U_out_min  = U_out_min, 
+    U_out_max  = U_out_max,
+    break_threshold=break_threshold,
+    perturb_W=True,
+    perturb_Y=False)
+
+    # ---- Compose figure ----
+    fig, axs = plt.subplots(1, 2, figsize=(fig_width, fig_height), sharex=True, sharey=True, constrained_layout=True)
+    
+    q = axs[0].quiver(
+        XY, YY, fx_nY, fy_nY,
+        speedY,
+        scale=arrow_scale,
+        cmap='inferno',
+        pivot='mid'
+    )
+    #cbar = fig.colorbar(q, axs=axs)
+    #cbar.set_label('|∇f| (vector magnitude)')
+
+    axs[0].set_xlabel(r'U in')
+    axs[0].set_ylabel(r'U out')
+    axs[0].set_title('Flow Map')
+    axs[0].set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+
+    q2 = axs[1].quiver(
+        XW, YW, fx_nW, fW_nW,
+        speedW,
+        scale=arrow_scale,
+        cmap='inferno',
+        pivot='mid'
+    )
+
+    axs[1].set_xlabel(r'U in')
+    axs[1].set_ylabel(r'U out')
+    axs[1].set_title('Flow Map')
+    axs[1].set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+
+    # Save PDF
+    pdf_path = os.path.join(folder, 'flow_map_tested_points.pdf')
+    fig.savefig(pdf_path)
+    plt.show()
+    print(f"Saved flow map with tested data points to {pdf_path}")
+
+    return 
 
 def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
                       W_birth, Y_birth,
@@ -1140,11 +1268,11 @@ def plot_segment_deriv(U0, V0, W0, X0, Y0, Z0,
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('Population', fontsize=12)
+    plt.xlabel('Time', fontsize=10)
+    plt.ylabel('Population', fontsize=10)
     plt.title(
         f"Modeling of a {(severity*100):.0f}\\% Extinction Event on {PLOT_LABELS['W']} and {PLOT_LABELS['V']} (" + PLOT_LABELS['Y'] + ")",
-        fontsize=14
+        fontsize=12
     )
     plt.legend(loc='best', fontsize=9)
     plt.grid(True)
@@ -1384,14 +1512,13 @@ def run_invasion_competition(V0, W0, Y0,
         plt.plot(cycles_idx, V_finals, label=PLOT_LABELS['V'], color='orange')
         if show_Y:
             plt.plot(cycles_idx, Y_finals, label=PLOT_LABELS['Y'], color='darkblue')
-        plt.xlabel('Cycle', fontsize=12)
-        plt.ylabel('Density', fontsize=12)
+        plt.xlabel('Cycle', fontsize=10)
+        plt.ylabel('Population', fontsize=10)
         titlestr = f"{PLOT_LABELS['V']}, {PLOT_LABELS['W']}, {PLOT_LABELS['Y']} after each cycle\n(severity={severity}"
         titlestr += ', W Perturbed, ' if perturb_W else ''
         titlestr += ', Y perturbed, ' if perturb_Y else ''
-        titlestr += 'U[in,out]: ({:.2f}, {:.2f}), X:({:.2f}, {:.2f}))'.format(
-            U_in, U_out, X_in, X_out)
-        plt.title(titlestr, fontsize=14)
+        titlestr += ')'
+        plt.title(titlestr, fontsize=12)
 
         plt.legend()
         plt.grid(True)
@@ -1518,12 +1645,12 @@ def plot_segment_competition(U0, V0, W0, X0, Y0, Z0,
 
 
     plt.axvline(x=0.0, color='gray', linestyle='--', lw=1)
-    plt.xlabel('Time', fontsize=12)
-    plt.ylabel('Population', fontsize=12)
+    plt.xlabel('Time', fontsize=10)
+    plt.ylabel('Population', fontsize=10)
     plt.title(
         rf'Modeling of a {(severity*100):.0f}\% Extinction Event on $W$ and $V$ (Y latent)' + '\n'
         + rf'$\Delta W = {delta_W_test:.4f}$',
-        fontsize=14
+        fontsize=12
     )
     plt.legend(loc='best', fontsize=9)
     plt.grid(True)
