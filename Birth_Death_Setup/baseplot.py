@@ -27,10 +27,6 @@ Y_death = 0.15
 
 Competition = 0.0004
 
-U_in= 0.2
-U_out = 0.1
-X_in = 1
-X_out = 0.1
 Z_in = 0.1
 Z_out = 0.1
 
@@ -49,7 +45,7 @@ X_in, X_out = (.1,000.1)
 # calculate starting values
 
 W,Y = compute_equilibrium(W_birth, W_death, Y_birth, Y_death)
-W0 = W/2
+W0 = 0.01
 
 V0 = W - W0
 
@@ -58,18 +54,18 @@ X0 = W0 / (X_out / X_in)
 U0 = V0 / (U_out / U_in)
 Z0 = Y0 / (Z_out /Z_in)
 
-dt = 0.01
+dt = 0.05
 
 
 if __name__ == '__main__':
 
     # test of run_segment function
 
-    plot_segment(U0, V0, W0, X0, Y0, Z0,W_birth, Y_birth,W_death, Y_death,X_in, X_out,U_in, U_out,Z_in, Z_out,Time=Time, dt=dt,use_X=True, use_Z=False,severity=severity,perturb_W=False, perturb_Y=True,perturb_time=10.0,tol=1e-7, plot_Y=False)
+    #plot_segment(U0, V0, W0, X0, Y0, Z0,W_birth, Y_birth,W_death, Y_death,X_in, X_out,U_in, U_out,Z_in, Z_out,Time=Time, dt=dt,use_X=True, use_Z=False,severity=severity,perturb_W=False, perturb_Y=True,perturb_time=10.0,tol=1e-7, plot_Y=False)
 
     # test of run invasion function
 
-    #run_invasion_competition(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, X_in, X_out,U_in, U_out, Z_in, Z_out, Competition, extinction_rate, dt,use_X, use_Z,severity,cycles=1000,perturb_W=False,perturb_Y=True ,plot=True,stop=None,break_threshold=np.inf)
+    run_invasion(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, X_in, X_out,U_in, U_out, Z_in, Z_out, extinction_rate, dt,use_X, use_Z,severity,cycles=8000,perturb_W=False,perturb_Y=True ,plot=True,stop=None,break_threshold=np.inf, show_Y=True)
 
     # test of global fitness (adnust grid size for bigger picture)
 

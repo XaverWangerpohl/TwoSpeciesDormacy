@@ -783,7 +783,8 @@ def reconstruct_and_flow_map(
     y_vals,
     folder='surface_flow',
     arrow_scale=20,
-    invert=False
+    invert=False,
+    figure_title=None
 ):
     """
     Reconstruct the scalar field f from sign data on a custom grid,
@@ -870,10 +871,14 @@ def reconstruct_and_flow_map(
     tested_y = [y_vals[j] for (_, j) in tested_nodes]
 
     # Plot quiver + tested data points
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_width))
+    # Plot only interior arrows (exclude edges where neighbors are incomplete)
+    XI, YI = X[1:-1, 1:-1], Y[1:-1, 1:-1]
+    fxI, fyI = fx_n[1:-1, 1:-1], fy_n[1:-1, 1:-1]
+    sI = speed[1:-1, 1:-1]
     q = ax.quiver(
-        X, Y, fx_n, fy_n,
-        speed,
+        XI, YI, fxI, fyI,
+        sI,
         scale=arrow_scale,
         cmap='inferno',
         pivot='mid'
@@ -884,8 +889,13 @@ def reconstruct_and_flow_map(
     ax.set_xlabel('U in')
     ax.set_ylabel('U out')
     ax.set_title('Flow Map with Tested Data Points')
+    ax.set_aspect('equal', adjustable='box')
     ax.legend()
-    plt.tight_layout()
+    if figure_title:
+        fig.suptitle(figure_title)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
 
     # Save PDF
     pdf_path = os.path.join(folder, 'flow_map_tested_points.pdf')
@@ -905,6 +915,161 @@ def reconstruct_and_flow_map(
                 predicted_signs[((i, j), (ii, jj))] = int(sign)
 
     return predicted_signs
+
+
+def flow_map_pair(
+    signs_W,
+    signs_Y,
+    x_vals,
+    y_vals,
+    folder='surface_flow',
+    arrow_scale=20,
+    invert=False,
+    titles=(r'$W^a$ extinction', r'$Y$ extinction'),
+    figure_title=None,
+    x_label='U in',
+    y_label='U out',
+):
+    """
+    Create two flow maps side by side: one for W extinction and one for Y extinction.
+    Each is reconstructed from a sign dictionary as in reconstruct_and_flow_map.
+    Saves a single PDF with both subplots.
+    """
+    os.makedirs(folder, exist_ok=True)
+    Nx = len(x_vals)
+    Ny = len(y_vals)
+    M = Nx * Ny
+    idx = lambda i, j: i * Ny + j
+
+    def reconstruct(signs):
+        rows, cols, data = [], [], []
+        g = np.zeros(M)
+        offsets = [(1,0), (-1,0), (0,1), (0,-1)]
+        for i in range(Nx):
+            for j in range(Ny):
+                n = idx(i, j)
+                deg = 0
+                for di, dj in offsets:
+                    ii, jj = i + di, j + dj
+                    if 0 <= ii < Nx and 0 <= jj < Ny:
+                        deg += 1
+                        rows.append(n); cols.append(idx(ii, jj)); data.append(-1)
+                        g[n] += signs.get(((i, j), (ii, jj)), 0)
+                rows.append(n); cols.append(n); data.append(deg)
+        L = sp.coo_matrix((data, (rows, cols)), shape=(M, M)).tocsr()
+        L[0, :] = 0; L[0, 0] = 1; g[0] = 0
+        f_vec = spla.spsolve(L, g)
+        f = f_vec.reshape((Nx, Ny))
+        fx, fy = np.gradient(f, x_vals, y_vals, edge_order=2)
+        return f, fx, fy
+
+    fW, fxW, fyW = reconstruct(signs_W)
+    fY, fxY, fyY = reconstruct(signs_Y)
+    X, Y = np.meshgrid(x_vals, y_vals, indexing='ij')
+
+    def norm_field(fx, fy):
+        speed = np.hypot(fx, fy)
+        fx_n = fx / (speed + 1e-8)
+        fy_n = fy / (speed + 1e-8)
+        if invert:
+            fx_n, fy_n = -fx_n, -fy_n
+        return fx_n, fy_n, speed
+
+    fxWn, fyWn, sW = norm_field(fxW, fyW)
+    fxYn, fyYn, sY = norm_field(fxY, fyY)
+
+    fig, axs = plt.subplots(1, 2, figsize=(2 * fig_width, fig_width), sharex=True, sharey=True)
+    for ax, fxn, fyn, spd, title in (
+        (axs[0], fxWn, fyWn, sW, titles[0]),
+        (axs[1], fxYn, fyYn, sY, titles[1]),
+    ):
+        # Only interior arrows
+        XI, YI = X[1:-1, 1:-1], Y[1:-1, 1:-1]
+        fxI, fyI = fxn[1:-1, 1:-1], fyn[1:-1, 1:-1]
+        sI = spd[1:-1, 1:-1]
+        q = ax.quiver(XI, YI, fxI, fyI, sI, scale=arrow_scale, cmap='inferno', pivot='mid')
+        ax.set_xlabel(x_label)
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_title(title)
+    axs[0].set_ylabel(y_label)
+
+    if figure_title:
+        fig.suptitle(figure_title)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
+
+    pdf_path = os.path.join(folder, 'flow_map_pair.pdf')
+    fig.savefig(pdf_path, bbox_inches='tight')
+    plt.show()
+    return pdf_path
+
+
+def flow_map_size(
+    V0, W0, Y0,
+    W_birth, Y_birth, W_death, Y_death,
+    Z_in, Z_size,
+    extinction_rate, dt,
+    use_X, use_Z,
+    cycles, severity,
+    grid_size=5,
+    U_in_min=0.01, U_in_max=0.4,
+    U_size_min=0.01, U_size_max=0.4,
+    folder='surface_flow',
+    break_threshold=0.01,
+    arrow_scale=20,
+    figure_title=None,
+):
+    """
+    Build local-invasibility sign fields on (U_in, U_size) for Y-extinction and W-extinction,
+    then render a paired flow map (side-by-side) with equal aspect. The Y-axis is labeled
+    with the seed-bank size symbol $\xi_W$.
+    Saves a combined PDF and returns its path.
+    """
+    # Y extinction signs on (U_in, U_size)
+    U_in_vals, U_size_vals, _scoreY, deltasY, _ = local_invasibility(
+        V0, W0, Y0,
+        W_birth, Y_birth, W_death, Y_death,
+        Z_in, Z_size,
+        extinction_rate, dt,
+        use_X, use_Z,
+        cycles, severity,
+        grid_size=grid_size,
+        U_in_min=U_in_min, U_in_max=U_in_max,
+        U_size_min=U_size_min, U_size_max=U_size_max,
+        folder='local_invasibility',
+        break_threshold=break_threshold,
+    )
+
+    # W extinction signs
+    _, _, _scoreW, deltasW, _ = local_invasibility(
+        V0, W0, Y0,
+        W_birth, Y_birth, W_death, Y_death,
+        Z_in, Z_size,
+        extinction_rate, dt,
+        use_X, use_Z,
+        cycles, severity,
+        grid_size=grid_size,
+        U_in_min=U_in_min, U_in_max=U_in_max,
+        U_size_min=U_size_min, U_size_max=U_size_max,
+        folder='local_invasibility',
+        break_threshold=break_threshold,
+        # Interpret extinction on W-species
+        )
+
+    title = figure_title or r'Flow Fields on $(U^{in}, \xi_W)$: $W^a$ vs $Y$ extinction'
+    pdf_path = flow_map_pair(
+        deltasW, deltasY,
+        U_in_vals, U_size_vals,
+        folder=folder,
+        arrow_scale=arrow_scale,
+        invert=False,
+        titles=(r'$W^a$ extinction', r'$Y$ extinction'),
+        figure_title=title,
+        x_label='U in',
+        y_label=r'$\xi_W$',
+    )
+    return pdf_path
 
 def simulate_segment_deriv(U0, V0, W0, X0, Y0, Z0,
                       W_birth, Y_birth,
@@ -1178,7 +1343,7 @@ def piplot(
     grid_size=50,
     U_in_min=0.01, U_in_max=0.99,
     X_in_min=0.01, X_in_max=0.99, U_size_baseline=1,
-    perturb_W=False, perturb_Y=True, speedplot=False, figure_title="Invasion (gray) and Extinction (white) of Mutant $\W^a$ "
+    perturb_W=False, perturb_Y=True, speedplot=False
 
 ):
     """
@@ -1249,11 +1414,8 @@ def piplot(
         plt.title(f'Pairwise Invasion Plot: ΔW after {cycles} cycles')
         cbar = plt.colorbar(im)
         cbar.set_label('ΔW (positive: invasion; negative: failure)')
-        if figure_title:
-            plt.suptitle(figure_title)
-            plt.tight_layout(rect=[0, 0, 1, 0.95])
-        else:
-            plt.tight_layout()
+
+        plt.tight_layout()
         plt.savefig(os.path.join(folder, cont_fname))
         plt.show()
 
@@ -1292,11 +1454,7 @@ def piplot(
     plt.xlabel(r'Resident rate $\alpha_W^{in}$')
     plt.ylabel(r'Mutant rate $\alpha_{\widetilde{W}}^{in}$' )
     plt.title(fr'Invasion (gray) and Extinction (white) of Mutant $W^a$' + '\n' + fr' ($\xi_W = {U_size_baseline})$')
-    if figure_title:
-        plt.suptitle(figure_title)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-    else:
-        plt.tight_layout()
+    plt.tight_layout()
     plt.savefig(os.path.join(folder, bin_fname))
     plt.show()
 
@@ -1359,7 +1517,8 @@ def plot_pip_pair_from_matrices(
     titles=None,
     mode='binary',  # 'binary' or 'continuous'
     out_folder='pipSeedbank_plots',
-    filename_prefix='pip_pair'
+    filename_prefix='pip_pair',
+    figure_title=None
 ):
     """
     Plot two PIP matrices side by side sharing the same axes and aspect ratio.
@@ -1372,6 +1531,9 @@ def plot_pip_pair_from_matrices(
 
     extent = [U_vals.min(), U_vals.max(), X_vals.min(), X_vals.max()]
     fig, axs = plt.subplots(1, 2, figsize=(fig_width, fig_height), sharex=True, sharey=True)
+    if figure_title:
+        fig.suptitle(figure_title)
+
 
     if titles is None:
         titles = ["PIP (left)", "PIP (right)"]
@@ -1394,7 +1556,10 @@ def plot_pip_pair_from_matrices(
         ax.set_aspect('equal', adjustable='box')
 
     axs[0].set_ylabel(r'Mutant rate $\alpha^{in}_W$')
-    plt.tight_layout()
+    if figure_title:
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+    else:
+        plt.tight_layout()
 
     # Incrementing filename to avoid overwrite
     pattern = os.path.join(out_folder, f'{filename_prefix}*.pdf')
@@ -1425,6 +1590,7 @@ def piplot_pair(
     U_size_pair=(1, 10),
     perturb_W=False, perturb_Y=True,
     mode='binary',
+    figure_title=None,
 ):
     """
     Compute two PIP ΔW matrices for two different U_size_baseline values and plot them side by side.
@@ -1459,6 +1625,21 @@ def piplot_pair(
     )
 
     titles = [rf'$\xi_W = {U_size_pair[0]}$', fr'$\xi_W = {U_size_pair[1]}$']
-    saved = plot_pip_pair_from_matrices(U_vals, X_vals, (mat_left, mat_right), titles=titles, mode=mode)
+    # Compose figure-level title including which parameter(s) were perturbed
+    if figure_title is None:
+        base = r'Invasion (gray) and Extinction (white) of $W^a$'
+    else:
+        base = figure_title
+    if perturb_W and perturb_Y:
+        pert = r'$W^a$ and $Y$'
+    elif perturb_W:
+        pert = r'$W^a,\widetilde{W}^a$'
+    elif perturb_Y:
+        pert = r'$Y$'
+    else:
+        pert = r'none'
+    full_title = base + ' (' + pert + ' perturbed)'
+
+    saved = plot_pip_pair_from_matrices(U_vals, X_vals, (mat_left, mat_right), titles=titles, mode=mode, figure_title=full_title)
 
     return U_vals, X_vals, mat_left, mat_right, saved

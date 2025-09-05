@@ -864,11 +864,15 @@ def reconstruct_and_flow_map(
 
     # Plot quiver + tested data points
     fig, ax = plt.subplots(figsize=(fig_width, fig_width))
+    # Plot only interior arrows (exclude edges where neighbors are incomplete)
+    XI, YI = X[1:-1, 1:-1], Y[1:-1, 1:-1]
+    fxI, fyI = fx_n[1:-1, 1:-1], fy_n[1:-1, 1:-1]
+    sI = speed[1:-1, 1:-1]
     q = ax.quiver(
-        X, Y, fx_n, fy_n,
-        speed,
+        XI, YI, fxI, fyI,
+        sI,
         scale=arrow_scale,
-        cmap='inferno',
+        cmap='viridis',
         pivot='mid'
     )
     #cbar = fig.colorbar(q, ax=ax)
@@ -951,7 +955,7 @@ def flow_map(V0, W0, Y0,
     Y0 = Y
     Z0 = Y0/ (Z_out /Z_in)
 
-    XY, YY, fx_nY, fy_nY, speedY,  = local_invasibility(
+    xY = local_invasibility(
     V0, W0, Y0,
     W_birth, Y_birth, W_death, Y_death,
     Z_in, Z_out,
@@ -967,7 +971,11 @@ def flow_map(V0, W0, Y0,
     perturb_Y=True,
     perturb_W=False)
 
-    XW, YW, fx_nW, fW_nW, speedW, = local_invasibility(
+    signsY  = xY[3]
+    x_valsY = xY[0]
+    y_valsY = xY[1] 
+
+    xW = local_invasibility(
     V0, W0, Y0,
     W_birth, Y_birth, W_death, Y_death,
     Z_in, Z_out,
@@ -983,38 +991,109 @@ def flow_map(V0, W0, Y0,
     perturb_W=True,
     perturb_Y=False)
 
+    signsW  = xW[3]
+    x_valsW = xW[0]
+    y_valsW = xW[1] 
+
+    os.makedirs(folder, exist_ok=True)
+    
+    def flow(signs, x_vals, y_vals, invert=True):
+        Nx = len(x_vals)
+        Ny = len(y_vals)
+        M = Nx * Ny
+        idx = lambda i, j: i * Ny + j
+
+        # Build sparse Laplacian and RHS g
+        rows, cols, data = [], [], []
+        g = np.zeros(M)
+        offsets = [(1,0), (-1,0), (0,1), (0,-1)]
+
+        for i in trange(Nx, desc='Building Laplacian'):
+            for j in range(Ny):
+                n = idx(i, j)
+                deg = 0
+                for di, dj in offsets:
+                    ii, jj = i + di, j + dj
+                    if 0 <= ii < Nx and 0 <= jj < Ny:
+                        deg += 1
+                        rows.append(n); cols.append(idx(ii, jj)); data.append(-1)
+                        g[n] += signs.get(((i, j), (ii, jj)), 0)
+                rows.append(n); cols.append(n); data.append(deg)
+
+        L = sp.coo_matrix((data, (rows, cols)), shape=(M, M)).tocsr()
+        L[0, :] = 0; L[0, 0] = 1; g[0] = 0
+
+        # Solve for f
+        f_vec = spla.spsolve(L, g)
+        f = f_vec.reshape((Nx, Ny))
+
+        # Compute gradient with non-uniform spacing
+        fx, fy = np.gradient(f, x_vals, y_vals, edge_order=2)
+
+        # Create meshgrid for plotting
+        X, Y = np.meshgrid(x_vals, y_vals, indexing='ij')
+
+        # Normalize vectors and optionally invert
+        speed = np.hypot(fx, fy)
+        fx_n = fx / (speed + 1e-8)
+        fy_n = fy / (speed + 1e-8)
+        if invert:
+            fx_n, fy_n = -fx_n, -fy_n
+
+        # Collect every tested data point (nodes)
+        tested_nodes = set()
+        for (i_j, ii_jj) in signs.keys():
+            i, j = i_j
+            ii, jj = ii_jj
+            if 0 <= i < Nx and 0 <= j < Ny:
+                tested_nodes.add((i, j))
+            if 0 <= ii < Nx and 0 <= jj < Ny:
+                tested_nodes.add((ii, jj))
+
+        tested_x = [x_vals[i] for (i, _) in tested_nodes]
+        tested_y = [y_vals[j] for (_, j) in tested_nodes]
+        
+        return X, Y, fx_n, fy_n, speed
+
     # ---- Compose figure ----
     fig, axs = plt.subplots(1, 2, figsize=(fig_width, fig_height), sharex=True, sharey=True, constrained_layout=True)
-    
+
+    fig.suptitle(r'Invasibility Flowmap for $\alpha^{in}$ and $\alpha^{out}$')
+
+    X, Y, fx_n, fy_n,speed = flow(signs=signsW, x_vals=x_valsW, y_vals=y_valsW)
+    # Plot quiver + tested data points
     q = axs[0].quiver(
-        XY, YY, fx_nY, fy_nY,
-        speedY,
-        scale=arrow_scale,
-        cmap='inferno',
-        pivot='mid'
+            X, Y, fx_n, fy_n,
+            speed,
+            scale=arrow_scale,
+            cmap='viridis',
+            pivot='mid'
     )
-    #cbar = fig.colorbar(q, axs=axs)
+    #cbar = fig.colorbar(q, axs[0]=axs[0])
     #cbar.set_label('|∇f| (vector magnitude)')
 
-    axs[0].set_xlabel(r'U in')
-    axs[0].set_ylabel(r'U out')
-    axs[0].set_title('Flow Map')
+    axs[0].set_xlabel(r'$\alpha^{in}$')
+    axs[0].set_ylabel(r'$\alpha^{out}$')
+    axs[0].set_title(r'$W^a$ and $\widetilde{W}^a$ perturbation')
     axs[0].set_aspect('equal', adjustable='box')
-    plt.tight_layout()
 
-    q2 = axs[1].quiver(
-        XW, YW, fx_nW, fW_nW,
-        speedW,
-        scale=arrow_scale,
-        cmap='inferno',
-        pivot='mid'
+
+
+    X, Y, fx_n, fy_n,speed = flow(signs=signsY, x_vals=x_valsY, y_vals=y_valsY)
+    # Plot quiver + tested data points
+    q = axs[1].quiver(
+            X, Y, fx_n, fy_n,
+            speed,
+            scale=arrow_scale,
+            cmap='viridis',
+            pivot='mid'
     )
+    #cbar = fig.colorbar(q, axs[1]=axs[1])
+    #cbar.set_label('|∇f| (vector magnitude)')
 
-    axs[1].set_xlabel(r'U in')
-    axs[1].set_ylabel(r'U out')
-    axs[1].set_title('Flow Map')
+    axs[1].set_xlabel(r'$\alpha^{in}$')
+    axs[1].set_title(r'$Y$ perturbation')
     axs[1].set_aspect('equal', adjustable='box')
-    plt.tight_layout()
 
     # Save PDF
     pdf_path = os.path.join(folder, 'flow_map_tested_points.pdf')

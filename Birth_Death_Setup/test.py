@@ -15,7 +15,8 @@ from sbsize import (compute_equilibrium,
                        global_invasability,
                        local_invasibility,
                        plot_segment_deriv,
-                       piplot
+                       piplot,
+                       piplot_pair
                        
                        )
 
@@ -57,7 +58,7 @@ Z0 = Y0 * Z_size
 
 dt = 0.01
 
-U_size_baseline = 100
+U_size_baseline = 10
 X_in_min = .01
 
 X_in_max = .2
@@ -73,8 +74,9 @@ if __name__ == '__main__':
 
     # test of run invasion function
 
-    piplot(V0=V0, W0=W0,Y0=Y0,
-           W_birth=W_birth, Y_birth=Y_birth,W_death=W_death, Y_death=Y_death,X_in_min=X_in_min,X_in_max=X_in_max,U_in_min=U_in_min,U_in_max=U_in_max, U_size_baseline=U_size_baseline, Z_in=Z_in, Z_size=Z_size,cycles=cycles,extinction_rate=extinction_rate, use_X=use_X, use_Z=use_Z,severity=severity,perturb_W=False, perturb_Y=True, dt=dt, grid_size=10)
+    U_vals, X_vals, m1, m2, out = piplot_pair(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, Z_in, Z_size, extinction_rate, dt, use_X, use_Z, cycles, severity, grid_size=4, U_in_min=0.01, U_in_max=0.99, X_in_min=0.01, X_in_max=0.99, U_size_pair=(1, 10), perturb_W=False, perturb_Y=True, mode='binary')
+
+    #piplot(V0=V0, W0=W0,Y0=Y0,W_birth=W_birth, Y_birth=Y_birth,W_death=W_death, Y_death=Y_death,X_in_min=X_in_min,X_in_max=X_in_max,U_in_min=U_in_min,U_in_max=U_in_max, U_size_baseline=U_size_baseline, Z_in=Z_in, Z_size=Z_size,cycles=cycles,extinction_rate=extinction_rate, use_X=use_X, use_Z=use_Z,severity=severity,perturb_W=False, perturb_Y=True, dt=dt, grid_size=4)
 
     #run_invasion(V0, W0, Y0, W_birth, Y_birth, W_death, Y_death, X_in, X_out,U_in, U_out, Z_in, Z_out,extinction_rate, dt,use_X, use_Z,severity,cycles=1000,perturb_W=False,perturb_Y=True ,plot=True,stop=None,break_threshold=np.inf)
 
